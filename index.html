@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HALF-LIFE 3</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100%;font-family:'Courier New',monospace}
+  #c{display:block;width:100%;height:100%}
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #filmvig{position:fixed;inset:0;pointer-events:none;z-index:4;
+   background:radial-gradient(ellipse at 50% 46%,#0000 52%,rgba(0,0,0,.55) 100%)}
+  #grain{position:fixed;inset:-140px;pointer-events:none;z-index:4;opacity:.07;mix-blend-mode:overlay}
+  .hudtext{color:#f90;text-shadow:0 0 6px #f903,0 0 2px #000;font-weight:bold;letter-spacing:1px}
+  #health{position:absolute;left:24px;bottom:20px;font-size:26px}
+  #suit{position:absolute;left:150px;bottom:20px;font-size:26px}
+  #ammo{position:absolute;right:24px;bottom:20px;font-size:26px;text-align:right}
+  #wpn{font-size:13px;opacity:.85}
+  #cross{position:absolute;left:50%;top:50%;width:0;height:0;--sp:7px}
+  #cross .cdot{position:absolute;left:-1px;top:-1px;width:2px;height:2px;background:#f90;box-shadow:0 0 4px #000}
+  #cross .ct{position:absolute;background:#f90;box-shadow:0 0 4px #000}
+  #cross .ct.n{left:-1px;top:calc(-8px - var(--sp));width:2px;height:8px}
+  #cross .ct.s{left:-1px;top:var(--sp);width:2px;height:8px}
+  #cross .ct.e{top:-1px;left:var(--sp);width:8px;height:2px}
+  #cross .ct.w{top:-1px;left:calc(-8px - var(--sp));width:8px;height:2px}
+  #mag.low{color:#ff7040;animation:lowam .7s infinite}
+  #mag.empty{color:#ff3020}
+  @keyframes lowam{0%,100%{opacity:1}50%{opacity:.35}}
+  #chapter{position:absolute;left:50%;top:18%;transform:translateX(-50%);font-size:30px;text-align:center;opacity:0;transition:opacity 1s}
+  #obj{position:absolute;left:50%;top:26%;transform:translateX(-50%);font-size:14px;text-align:center;opacity:0;transition:opacity 1s;color:#fc6}
+  #msg{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:15px;text-align:center;opacity:0;transition:opacity .5s;color:#fff}
+  #dmg{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(255,0,0,.45));opacity:0;transition:opacity .15s}
+  #vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 58%,rgba(0,0,0,.42));pointer-events:none}
+  #heal{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(80,255,120,.25));opacity:0;transition:opacity .3s}
+  #menu{position:fixed;inset:0;z-index:10;background:linear-gradient(rgba(4,6,10,.55),rgba(4,6,10,.78)),url('keyart.png') center/cover no-repeat #05070a;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#f90;cursor:pointer}
+  #menu h1{font-size:64px;margin:0;letter-spacing:6px;text-shadow:0 0 24px #f906}
+  #menu h1 .lam{color:#fff}
+  #menu p{color:#889;font-size:14px;margin:6px 0}
+  #menu .go{margin-top:28px;font-size:18px;color:#f90;border:1px solid #f906;padding:10px 26px;animation:p 1.6s infinite}
+  @keyframes p{0%,100%{opacity:.5}50%{opacity:1}}
+  #end{position:fixed;inset:0;z-index:11;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;color:#f90}
+  #load{position:fixed;inset:0;z-index:12;background:#000;color:#f90;display:flex;align-items:center;justify-content:center;font-size:14px;letter-spacing:2px}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="filmvig"></div><div id="grain"></div>
+<div id="hud">
+  <div id="cross"><div class="cdot"></div><div class="ct n"></div><div class="ct s"></div><div class="ct e"></div><div class="ct w"></div></div>
+  <div id="health" class="hudtext">100</div>
+  <div id="suit" class="hudtext">0</div>
+  <div id="ammo" class="hudtext"><span id="mag">--</span><div id="wpn"></div></div>
+  <div id="chapter" class="hudtext"></div>
+  <div id="obj" class="hudtext"></div>
+  <div id="wp" style="position:absolute;color:#fa0;font-size:14px;text-shadow:0 0 6px #f90;opacity:.85;pointer-events:none;display:none;transform:translate(-50%,-50%)">&#9670;<div id="wpd" style="font-size:9px;text-align:center;color:#fc8"></div></div>
+  <div id="msg" class="hudtext"></div>
+  <div id="vig"></div><div id="dmg"></div><div id="heal"></div><div id="dmgdir" style="position:absolute;left:50%;top:50%;width:130px;height:130px;transform:translate(-50%,-50%);border:4px solid transparent;border-top-color:rgba(255,45,20,.85);border-radius:50%;opacity:0;pointer-events:none"></div>
+<div id="hitm" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:22px;opacity:0;text-shadow:0 0 4px #f90">&#10005;</div>
+</div>
+<div id="menu">
+  <h1>HALF-LIFE <span class="lam">&lambda;</span></h1>
+  <p>A FAN-MADE CONTINUATION &nbsp;|&nbsp; AFTER EPISODE TWO &amp; ALYX</p>
+  <p style="color:#667">"Come along with me now. We've places to do and things to be."</p>
+  <p style="color:#667;font-size:12px">WASD MOVE &nbsp; MOUSE LOOK &nbsp; CLICK FIRE &nbsp; R RELOAD &nbsp; 1-6 WEAPONS &nbsp; E USE / GRAVITY GUN &nbsp; SHIFT SPRINT &nbsp; SPACE JUMP</p>
+  <div id="opts" style="margin-top:20px;font-size:12px;color:#f90;display:flex;gap:22px;align-items:center">
+   <label>SENSITIVITY <input id="opt-sens" type="range" min="30" max="200" value="100" style="width:100px;accent-color:#f90;vertical-align:middle"></label>
+   <label>VOLUME <input id="opt-vol" type="range" min="0" max="100" value="100" style="width:100px;accent-color:#f90;vertical-align:middle"></label>
+   <label>QUALITY <select id="opt-q" style="background:#0a0c10;color:#f90;border:1px solid #f905;font-family:inherit;font-size:12px"><option value="high">HIGH</option><option value="low">LOW</option></select></label>
+  </div>
+  <div class="go">CLICK TO BEGIN</div>
+</div>
+<div id="pause" style="position:fixed;inset:0;z-index:10;background:rgba(3,5,8,.85);display:none;flex-direction:column;align-items:center;justify-content:center;color:#f90">
+ <h2 style="letter-spacing:6px;margin:0 0 4px;font-size:30px">PAUSED</h2>
+ <p style="color:#667;font-size:12px;margin:0 0 20px">HEV SUIT STANDBY</p>
+ <div id="pause-resume" style="border:1px solid #f906;padding:9px 30px;margin:5px;cursor:pointer;font-size:15px">RESUME</div>
+ <div id="pause-restart" style="border:1px solid #f904;padding:9px 30px;margin:5px;cursor:pointer;font-size:13px;color:#fa8">RESTART CHAPTER</div>
+ <div id="pause-quit" style="border:1px solid #f904;padding:9px 30px;margin:5px;cursor:pointer;font-size:13px;color:#fa8">QUIT TO TITLE</div>
+ <div style="margin-top:18px;font-size:12px;display:flex;gap:18px;align-items:center;color:#fa8">
+  <label>SENS <input id="p-sens" type="range" min="30" max="200" style="width:80px;accent-color:#f90;vertical-align:middle"></label>
+  <label>VOL <input id="p-vol" type="range" min="0" max="100" style="width:80px;accent-color:#f90;vertical-align:middle"></label>
+  <label>QUALITY <select id="p-q" style="background:#0a0c10;color:#f90;border:1px solid #f905;font-family:inherit;font-size:12px"><option value="high">HIGH</option><option value="low">LOW</option></select></label>
+ </div>
+</div>
+<div id="end"></div>
+<div id="load">RECALIBRATING HEV SUIT...</div>
+<div id="chcard" style="position:fixed;inset:0;z-index:8;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;color:#ccc;transition:opacity .6s"><div id="chcard-t" style="font-size:15px;letter-spacing:3px;color:#889"></div><div id="chcard-h" style="font-size:34px;letter-spacing:6px;color:#eee;margin-top:10px"></div></div>
+<script type="module">
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+
+// ============================================================= CORE
+const P = new URLSearchParams(location.search);
+const FF = +P.get('ff')||0, DEMO = P.get('demo')==='1', START_CH = (+P.get('chapter')||1)-1;
+const AUTO = P.get('auto')==='1', GOD = P.get('god')==='1';
+const OPT = Object.assign({sens:1,vol:1,q:'high'}, JSON.parse(localStorage.getItem('hl3opt')||'{}'));
+const STEP_SND=[[.06,.07,480,'lowpass'],[.09,.045,2400,'bandpass'],[.05,.09,300,'lowpass'],[.05,.06,950,'lowpass'],[.07,.05,600,'bandpass']];
+function saveOPT(){ try{localStorage.setItem('hl3opt',JSON.stringify(OPT));}catch(e){} }
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = OPT.q!=='low'; renderer.shadowMap.type = THREE.PCFShadowMap;
+if(OPT.q==='low')renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.35;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, .08, 900);
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.32,.55,.82);
+composer.addPass(bloomPass); composer.addPass(new OutputPass());
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight)});
+
+const $ = id=>document.getElementById(id);
+const rand=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const V3=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
+
+// ============================================================= AUDIO (all synth, no assets)
+const AU = {ctx:null, musGain:null,
+ init(){ if(this.ctx) return; const C=this.ctx=new (window.AudioContext||window.webkitAudioContext)();
+   this.master=C.createGain(); this.master.gain.value=.55*OPT.vol; this.master.connect(C.destination);
+   this.musGain=C.createGain(); this.musGain.gain.value=.35; this.musGain.connect(this.master);
+   this.dly=C.createDelay(.5); this.dly.delayTime.value=.12;
+   const fb=C.createGain(); fb.gain.value=.28, wet=C.createGain(); wet.gain.value=.13;
+   this.master.connect(this.dly); this.dly.connect(fb); fb.connect(this.dly); this.dly.connect(wet); wet.connect(C.destination);},
+ env(g,t,a,d,sus){ g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(1,t+a); g.gain.exponentialRampToValueAtTime(Math.max(sus,.001),t+a+d); },
+ tone(f0,f1,dur,type='square',vol=.3,when=0){ if(!this.ctx)return; const C=this.ctx,t=C.currentTime+when;
+   const o=C.createOscillator(),g=C.createGain(); o.type=type; o.frequency.setValueAtTime(f0,t);
+   if(f1!==null)o.frequency.exponentialRampToValueAtTime(Math.max(f1,1),t+dur);
+   g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+   o.connect(g); g.connect(this.master); o.start(t); o.stop(t+dur+.02); },
+ noise(dur,vol=.3,freq=1200,type='bandpass',when=0){ if(!this.ctx)return; const C=this.ctx,t=C.currentTime+when;
+   const len=Math.ceil(C.sampleRate*dur), buf=C.createBuffer(1,len,C.sampleRate), d=buf.getChannelData(0);
+   for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+   const s=C.createBufferSource(); s.buffer=buf; const f=C.createBiquadFilter(); f.type=type; f.frequency.value=freq; f.Q.value=.8;
+   const g=C.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+   s.connect(f); f.connect(g); g.connect(this.master); s.start(t); s.stop(t+dur+.02); },
+ shoot(kind){ if(!this.ctx)return;
+   if(kind==='crowbar'){ this.noise(.08,.25,2400,'highpass'); }
+   else if(kind==='pistol'){ this.tone(900,120,.09,'square',.35); this.noise(.07,.3,3000); }
+   else if(kind==='smg'){ this.tone(700,140,.07,'square',.28); this.noise(.06,.25,2600); }
+   else if(kind==='shotgun'){ this.tone(300,60,.16,'sawtooth',.5); this.noise(.18,.5,900); }
+   else if(kind==='pulse'){ this.tone(1400,300,.14,'sawtooth',.3); this.tone(700,150,.2,'square',.18,.02); }
+   else if(kind==='grav'){ this.tone(180,520,.22,'sine',.3); }
+   else if(kind==='gravfire'){ this.tone(520,90,.18,'sawtooth',.35); this.noise(.1,.2,1800); } },
+ hit(){ this.tone(200,80,.08,'square',.25); },
+ headcrab(){ this.tone(1200,1900,.12,'sine',.15); this.tone(1600,900,.1,'sine',.12,.08); },
+ zombie(){ this.tone(140,60,.5,'sawtooth',.2); this.noise(.4,.12,300,'lowpass'); },
+ soldier(){ this.noise(.15,.15,1800); },
+ boom(){ this.noise(.6,.7,150,'lowpass'); this.tone(90,30,.5,'sine',.5); },
+ pickup(){ this.tone(660,660,.07,'sine',.25); this.tone(990,990,.09,'sine',.25,.07); },
+ hevsound(){ this.tone(440,880,.3,'sine',.2); },
+ hurt(){ this.tone(160,70,.15,'sawtooth',.3); },
+ stinger(){ [220,277,330,440].forEach((f,i)=>this.tone(f,f,.5,'sine',.14,i*.14)); },
+ // ambient music: slow industrial pad
+ music: {step:0, next:0, scale:[110,130.8,146.8,164.8,196,220],
+  update(t){ if(!AU.ctx)return; if(t<this.next)return; this.next=t+2.4;
+   const f=this.scale[Math.floor(Math.random()*this.scale.length)];
+   const C=AU.ctx,o=C.createOscillator(),o2=C.createOscillator(),g=C.createGain();
+   o.type='sawtooth';o2.type='sawtooth'; o.frequency.value=f; o2.frequency.value=f*1.005;
+   const fl=C.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=300+Math.random()*250;
+   g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.06,t+1.2); g.gain.linearRampToValueAtTime(0,t+2.4);
+   o.connect(fl);o2.connect(fl); fl.connect(g); g.connect(AU.musGain); o.start(t);o2.start(t); o.stop(t+2.5);o2.stop(t+2.5);
+   if(Math.random()<.3)AU.noise(1.8,.02,220,'lowpass'); }}
+};
+
+// ============================================================= PLAYER
+const player = {
+ pos: V3(0,1.7,6), vel: V3(), yaw: Math.PI, pitch: 0,
+ hp: 100, suit: 0, dead: false,
+ onGround: true, bob: 0, speed: 5.2, sprintMul: 1.6,
+ keys: {}, weapon: 'crowbar', weapons: {crowbar:true},
+ ammo: {pistol:18, smg:0, shotgun:0, pulse:0},
+ reserve: {pistol:90, smg:0, shotgun:0, pulse:0},
+ mags: {pistol:18, smg:45, shotgun:6, pulse:30},
+ reloading: 0, fireCd: 0, swingT: 0, heldProp: null, hurtT: 0
+};
+const WDEF = {
+ crowbar:{name:'CROWBAR', melee:true, dmg:40, rate:.45, range:2.6},
+ pistol:{name:'USP MATCH', dmg:15, rate:.28, auto:false, spread:.012, mag:'pistol', rec:.010},
+ smg:{name:'MP7 SMG', dmg:11, rate:.085, auto:true, spread:.03, mag:'smg', rec:.0042},
+ shotgun:{name:'SPAS-12', dmg:9, pellets:8, rate:.8, auto:false, spread:.07, mag:'shotgun', rec:.024},
+ pulse:{name:'OSIPR PULSE', dmg:22, rate:.14, auto:true, spread:.01, mag:'pulse', proj:true, rec:.0055},
+ grav:{name:'ZERO-POINT ENERGY FIELD MANIPULATOR', dmg:0, rate:.5, grav:true}
+};
+const WORDER = ['crowbar','pistol','smg','shotgun','pulse','grav'];
+addEventListener('keydown',e=>{ player.keys[e.code]=true;
+ if(e.code.startsWith('Digit')){ const i=+e.code.slice(5)-1; const w=WORDER[i]; if(w&&player.weapons[w])equip(w); }
+ if(e.code==='KeyQ'&&player._lastW&&player.weapons[player._lastW])equip(player._lastW);
+ if(e.code==='KeyR')startReload();
+ if(e.code==='KeyE')useKey();
+ if(e.code==='KeyF')tryGlovePull();
+});
+addEventListener('keyup',e=>player.keys[e.code]=false);
+addEventListener('mousedown',e=>{ if(!locked)return; player.mouseDown=true; if(e.button===0)tryFire(); if(e.button===2)gravAlt(); });
+addEventListener('mouseup',()=>player.mouseDown=false);
+addEventListener('contextmenu',e=>e.preventDefault());
+let locked=false;
+// film grain - generated tile, jittered 9x/sec for a living frame
+{ const gc=document.createElement('canvas'); gc.width=gc.height=128;
+ const gx=gc.getContext('2d'); const im=gx.createImageData(128,128);
+ for(let i=0;i<im.data.length;i+=4){ const v=110+Math.random()*145|0;
+  im.data[i]=im.data[i+1]=im.data[i+2]=v; im.data[i+3]=255; }
+ gx.putImageData(im,0,0);
+ const gel=document.getElementById('grain');
+ gel.style.backgroundImage='url('+gc.toDataURL()+')';
+ setInterval(()=>{ gel.style.transform='translate('+((Math.random()*140)|0)+'px,'+((Math.random()*140)|0)+'px)'; },110); }
+canvas.addEventListener('click',()=>{ if(!locked&&started)canvas.requestPointerLock(); });
+let paused=false;
+document.addEventListener('pointerlockchange',()=>{ locked=document.pointerLockElement===canvas;
+ if(!locked&&started&&!AUTO&&!player.dead&&!chapterData.completing&&$('end').style.display!=='flex'){ paused=true; $('pause').style.display='flex'; syncPauseOpts(); } });
+addEventListener('mousemove',e=>{ if(!locked)return;
+ player.yaw -= e.movementX*.0021*OPT.sens; player.pitch = clamp(player.pitch - e.movementY*.0021*OPT.sens, -1.5, 1.5); });
+
+function equip(w){ if(player.weapon===w)return; player._lastW=player.weapon; player.weapon=w; player.reloading=0; player.swingT=.25; AU.pickup(); buildViewmodel(); updateHUD(); }
+function startReload(){ const w=WDEF[player.weapon]; if(!w||!w.mag)return; const k=w.mag;
+ if(player.ammo[k]>=player.mags[k]||player.reserve[k]<=0||player.reloading>0)return;
+ player.reloading = player.weapon==='shotgun'?2.0:1.4; AU.tone(300,200,.1,'square',.2); }
+function finishReload(){ const k=WDEF[player.weapon].mag; const need=player.mags[k]-player.ammo[k];
+ const take=Math.min(need,player.reserve[k]); player.ammo[k]+=take; player.reserve[k]-=take; AU.tone(500,700,.08,'square',.2); updateHUD(); }
+
+// ============================================================= VIEWMODEL (box-built weapons)
+const vmGroup = new THREE.Group(); camera.add(vmGroup); scene.add(camera);
+let vmKick=0, muzzleL=null, muzzleFlash=null;
+function muzzleFire(){
+ if(!muzzleL){ muzzleL=new THREE.PointLight(0xffc060,0,4,2); muzzleL.position.set(.34,-.2,-1.1); camera.add(muzzleL);
+  muzzleFlash=new THREE.Mesh(new THREE.PlaneGeometry(.22,.22),
+   new THREE.MeshBasicMaterial({color:0xffd080,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));
+  muzzleFlash.position.set(.34,-.26,-1.0); camera.add(muzzleFlash); }
+ muzzleL.intensity=2.6; muzzleFlash.material.opacity=.9; muzzleFlash.rotation.z=Math.random()*6.28;
+}
+vmGroup.position.set(.34,-.32,-.6);
+let vmParts=[];
+function mat(c,rough=.8,metal=.1){ return new THREE.MeshStandardMaterial({color:c,roughness:rough,metalness:metal}); }
+function box(w,h,d,c,x=0,y=0,z=0,m){ const g=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m||mat(c)); g.position.set(x,y,z); return g; }
+function buildViewmodel(){
+ for(const p of vmParts)vmGroup.remove(p); vmParts=[];
+ const w=player.weapon;
+ if(w==='crowbar'){ const g=new THREE.Group();
+  const shaft=box(.035,.035,.7,0xb22222,0,0,0,mat(0xb22222,.5,.7)); shaft.rotation.x=.3; g.add(shaft);
+  const hook=box(.035,.12,.05,0xb22222,0,.06,.34,mat(0xb22222,.5,.7)); hook.rotation.x=-.5; g.add(hook);
+  const lam=new THREE.Mesh(new THREE.CircleGeometry(.014,10),new THREE.MeshStandardMaterial({color:0xcc7722,emissive:0xaa5500,emissiveIntensity:1.2})); lam.position.set(.018,.02,.1); lam.rotation.y=Math.PI/2; g.add(lam);
+  g.rotation.z=-.4; vmGroup.add(g); vmParts.push(g); }
+ else if(w==='pistol'){ const g=new THREE.Group();
+  g.add(box(.05,.09,.22,0x222831,0,0,0,mat(0x222831,.4,.8)));
+  g.add(box(.045,.11,.05,0x333a45,0,-.09,.06,mat(0x333a45,.5,.6)));
+  g.add(box(.02,.02,.04,0x888,0,.055,-.09,mat(0x888888,.3,.9))); const sd=new THREE.Mesh(new THREE.BoxGeometry(.012,.012,.012),new THREE.MeshStandardMaterial({color:0x33ff66,emissive:0x22cc44,emissiveIntensity:2})); sd.position.set(0,.062,-.1); g.add(sd); g.rotation.x=.08; vmGroup.add(g); vmParts.push(g); }
+ else if(w==='smg'){ const g=new THREE.Group();
+  g.add(box(.06,.1,.4,0x1a1d22,0,0,-.05,mat(0x1a1d22,.45,.7)));
+  g.add(box(.05,.16,.06,0x2a2e35,0,-.12,.05,mat(0x2a2e35,.5,.6)));
+  g.add(box(.03,.03,.16,0x111,0,.02,-.3,mat(0x111111,.3,.9)));
+  const ctr=new THREE.Mesh(new THREE.BoxGeometry(.062,.02,.05),new THREE.MeshStandardMaterial({color:0x114422,emissive:0x33ff77,emissiveIntensity:1.6})); ctr.position.set(0,.05,.08); g.add(ctr);
+  g.rotation.x=.06; vmGroup.add(g); vmParts.push(g); }
+ else if(w==='shotgun'){ const g=new THREE.Group();
+  g.add(box(.055,.08,.55,0x30251a,0,0,-.1,mat(0x30251a,.6,.3)));
+  g.add(box(.04,.04,.5,0x444c55,0,.05,-.15,mat(0x444c55,.35,.85)));
+  g.add(box(.06,.07,.12,0x444c55,0,-.01,-.32,mat(0x444c55,.4,.8)));
+  const bead=new THREE.Mesh(new THREE.BoxGeometry(.014,.014,.014),new THREE.MeshStandardMaterial({color:0xffcc44,emissive:0xdd9922,emissiveIntensity:2})); bead.position.set(0,.075,-.38); g.add(bead);
+  g.rotation.x=.05; vmGroup.add(g); vmParts.push(g); }
+ else if(w==='pulse'){ const g=new THREE.Group();
+  g.add(box(.08,.12,.5,0x2a3438,0,0,-.08,mat(0x2a3438,.4,.7)));
+  const cell=box(.05,.06,.14,0x77e0ff,0,.03,-.12,mat(0x77e0ff,.2,.2)); cell.material.emissive=new THREE.Color(0x2288cc); cell.material.emissiveIntensity=1.4; g.add(cell);
+  g.add(box(.03,.03,.2,0x15181c,0,0,-.38,mat(0x15181c,.3,.9)));
+  g.rotation.x=.05; vmGroup.add(g); vmParts.push(g); }
+ else if(w==='grav'){ const g=new THREE.Group();
+  g.add(box(.09,.09,.3,0xd97b29,0,0,0,mat(0xd97b29,.5,.6)));
+  const core=new THREE.Mesh(new THREE.SphereGeometry(.05,12,12),new THREE.MeshStandardMaterial({color:0x99ddff,emissive:0x3388ff,emissiveIntensity:2})); core.position.set(0,0,-.2); g.add(core);
+  for(let i=0;i<3;i++){ const prong=box(.02,.02,.18,0xd97b29,Math.cos(i/3*6.28)*.06,Math.sin(i/3*6.28)*.06,-.26,mat(0xd97b29,.5,.6)); prong.rotation.y=i/3*6.28; g.add(prong); }
+  g.userData.core=core; g.rotation.x=.05; vmGroup.add(g); vmParts.push(g); }
+}
+
+// ============================================================= WORLD / PHYSICS PROPS / COLLIDERS
+let colliders=[];   // {min:V3,max:V3} AABBs
+let platforms=[];  // {x,z,hw,hd,top} standable surfaces
+let thrown=[];     // zombie-hurled props {mesh,vel,dmg,t}
+let props=[];       // physics props {mesh,vel,half:V3,held,flammable,buoyant}
+let pickups=[];     // {mesh,kind,amount,spin}
+let enemies=[];
+let projectiles=[];
+let levelGroup=null;
+let groundY = x=>0; // per-chapter height function
+
+function addCollider(x,y,z,w,h,d){ colliders.push({min:V3(x-w/2,y,z-d/2),max:V3(x+w/2,y+h,z+d/2)}); }
+function makeProp(x,y,z,s=0.6,kind='crate'){
+ const m = kind==='barrel'
+   ? new THREE.Mesh(new THREE.CylinderGeometry(s*.4,s*.4,s*1.1,10), mat(kind==='barrel'?0x7a3020:0x8a6a3a,.7,.2))
+   : new THREE.Mesh(new THREE.BoxGeometry(s,s,s), mat(0x8a6a3a,.85,.05));
+ m.position.set(x,y,z); m.castShadow=true; levelGroup.add(m);
+ const p={mesh:m,vel:V3(),half:V3(kind==='barrel'?s*.4:s/2, s*(kind==='barrel'?.55:.5), kind==='barrel'?s*.4:s/2),held:false,flammable:true,kind,hp:kind==='crate'?25:Infinity};
+ props.push(p); return p;
+}
+function shatterProp(p){ // crates break into flying fragments
+ if(p.dead)return; p.dead=true;
+ const box3=new THREE.Box3().setFromObject(p.mesh); const c=box3.getCenter(new THREE.Vector3());
+ const sz=p.half.x*2;
+ for(let i=0;i<7;i++){ const frag=new THREE.Mesh(new THREE.BoxGeometry(sz*.3,sz*.3,sz*.3),mat(0x7a5a32,.9,.05));
+  frag.position.copy(c).add(V3(rand(-.2,.2),rand(-.2,.2),rand(-.2,.2)));
+  levelGroup.add(frag);
+  const fv=V3(rand(-3,3),rand(2,5),rand(-3,3)); const born=performance.now();
+  const tick=()=>{ const age=(performance.now()-born)/1000;
+   if(age>1.2||frag.parent!==levelGroup){ levelGroup.remove(frag); return; }
+   fv.y-=12*.016; frag.position.addScaledVector(fv,.016);
+   frag.rotation.x+=.1; frag.rotation.z+=.07;
+   frag.material.opacity=1-age/1.2; frag.material.transparent=true;
+   requestAnimationFrame(tick); };
+  tick(); }
+ levelGroup.remove(p.mesh); AU.noise(.15,.4,900);
+}
+function damageProp(p,dmg,dir){
+ if(p.kind==='barrel'){ explodeProp(p); return; }
+ p.hp-=dmg;
+ if(dir)p.vel.add(dir.clone().multiplyScalar(2));
+ if(p.hp<=0)shatterProp(p);
+}
+function makePickup(x,y,z,kind,amount=1){
+ let m;
+ const glow=(c)=>new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.9});
+ if(kind==='health'){ m=new THREE.Group(); m.add(box(.24,.1,.24,0xddd,0,0,0,mat(0xcccccc,.5))); m.add(box(.06,.16,.06,0xd33,0,.06,0,glow(0xcc2222))); m.add(box(.16,.06,.06,0xd33,0,.06,0,glow(0xcc2222))); }
+ else if(kind==='suit'){ m=box(.26,.18,.1,0xfa0,0,0,0,glow(0xdd7700)); }
+ else if(kind==='ammo_pistol'||kind==='ammo_smg'||kind==='ammo_shotgun'||kind==='ammo_pulse'){ m=box(.22,.12,.14,0x334,0,0,0,mat(0x39424e,.4,.6)); m.add(box(.1,.05,.05,0xfa0,0,.08,0,glow(0xdd7700))); }
+ else if(kind==='weapon'){ m=box(.5,.08,.1,0xfa0,0,0,0,glow(0xcc6600)); }
+ else if(kind==='cache'){ m=new THREE.Group(); m.add(box(.5,.5,.5,0x5a4a2a,0,0,0,mat(0x5a4a2a,.9))); const l=box(.3,.3,.02,0xfa0,0,0,.26,glow(0xff8800)); m.add(l); }
+ m.position.set(x,y,z); levelGroup.add(m);
+ pickups.push({mesh:m,kind,amount,baseY:y,spin:Math.random()*6});
+}
+function updateProps(dt){
+ for(let i=props.length-1;i>=0;i--)if(props[i].dead)props.splice(i,1);
+ for(const p of props){
+  if(p.held){ // gravity gun hold: float in front of camera
+   const target=V3(0,0,-2.2).applyQuaternion(camera.quaternion).add(camera.position);
+   p.vel.lerp(target.clone().sub(p.mesh.position).multiplyScalar(10),.4);
+  } else {
+   p.vel.y -= 14*dt;
+   p.vel.multiplyScalar(1-2.2*dt);
+  }
+  p.mesh.position.addScaledVector(p.vel,dt);
+  const gy=groundY(p.mesh.position.x,p.mesh.position.z)+p.half.y;
+  if(p.mesh.position.y<gy){ p.mesh.position.y=gy; p.vel.y=Math.abs(p.vel.y)>2?-p.vel.y*.3:0; p.vel.x*=.8; p.vel.z*=.8; }
+  // prop-prop and prop-enemy damage when moving fast
+  const sp=p.vel.length();
+  if(sp>7){ for(const e of enemies){ if(e.hp>0 && e.mesh.position.distanceTo(p.mesh.position)<1.2){
+   if(p.kind==='barrel'){ explodeProp(p); break; }
+   damageEnemy(e, sp*6, p.vel); p.vel.multiplyScalar(.4);} } }
+  p.mesh.rotation.x+=p.vel.z*dt*.4; p.mesh.rotation.z-=p.vel.x*dt*.4;
+ }
+ for(let i=pickups.length-1;i>=0;i--){ const pk=pickups[i];
+  if(pk.pulled){ pk.mesh.position.lerp(player.pos,Math.min(1,dt*7)); pk.mesh.rotation.y+=dt*9; }
+  else { pk.spin+=dt*2; pk.mesh.rotation.y=pk.spin; pk.mesh.position.y=pk.baseY+Math.sin(pk.spin*1.3)*.06; }
+  if(pk.mesh.position.distanceTo(player.pos)<1.3){ collectPickup(pk); pickups.splice(i,1); levelGroup.remove(pk.mesh); }
+ }
+}
+function tryGlovePull(){
+ const fwd=V3(0,0,-1).applyQuaternion(camera.quaternion); let best=null,ba=.992;
+ for(const pk of pickups){ if(pk.kind==='weapon')continue;
+  const to=pk.mesh.position.clone().sub(camera.position); const d=to.length(); if(d>10||d<1)continue;
+  const a=to.normalize().dot(fwd); if(a>ba){ ba=a; best=pk; } }
+ if(best){ best.pulled=true; AU.tone(300,900,.18,'sine',.2); }
+}
+function collectPickup(pk){
+ const k=pk.kind;
+ if(k==='health'){ if(player.hp>=100)return reAdd(pk); player.hp=clamp(player.hp+pk.amount,0,100); AU.hevsound(); flashHeal(); }
+ else if(k==='suit'){ player.suit=clamp(player.suit+pk.amount,0,100); AU.hevsound(); }
+ else if(k==='ammo_pistol'){ player.reserve.pistol+=pk.amount; AU.pickup(); }
+ else if(k==='ammo_smg'){ player.reserve.smg+=pk.amount; AU.pickup(); }
+ else if(k==='ammo_shotgun'){ player.reserve.shotgun+=pk.amount; AU.pickup(); }
+ else if(k==='ammo_pulse'){ player.reserve.pulse+=pk.amount; AU.pickup(); }
+ else if(k==='cache'){ player.hp=100; player.suit=clamp(player.suit+50,0,100); AU.stinger(); flashHeal(); showMsg('LAMBDA SUPPLY CACHE'); }
+ updateHUD();
+}
+function reAdd(pk){ pickups.push(pk); levelGroup.add(pk.mesh); } // not needed yet (full hp)
+
+// ============================================================= COMBAT
+function tryFire(){
+ const w=WDEF[player.weapon]; if(player.fireCd>0||player.reloading>0||player.dead)return;
+ if(w.melee){ player.fireCd=w.rate; player.swingT=.35; player.heat=Math.min((player.heat||0)+.7,1.2); AU.shoot('crowbar');
+  // melee raycast short range
+  const hits=raycastEnemies(w.range); if(hits.length){ damageEnemy(hits[0].e,w.dmg,hits[0].dir); AU.hit(); }
+  // break props
+  const pr=raycastProps(w.range); if(pr){ pr.vel.add(V3(0,0,-6).applyQuaternion(camera.quaternion)); pr.vel.y+=2; damageProp(pr,w.dmg); }
+  return; }
+ if(w.grav){ gravPrimary(); return; }
+ const k=w.mag; if(player.ammo[k]<=0){ startReload(); return; }
+ player.ammo[k]--; player.fireCd=w.rate; player.swingT=.18; player.heat=Math.min((player.heat||0)+.5,1.2); AU.shoot(player.weapon);
+ vmKick=Math.min(vmKick+(w.pellets?.14:.05),.2); muzzleFire();
+ player.recoil=Math.min((player.recoil||0)+(w.rec||.006),.09); player.pitch=Math.min(player.pitch+(w.auto?.0012:.0025),1.4);
+ const n=w.pellets||1;
+ for(let i=0;i<n;i++){
+  const effSp=w.spread*(1+(player.heat||0)*1.8+Math.hypot(player.vel.x,player.vel.z)*.05);
+  const dir=V3(rand(-effSp,effSp),rand(-effSp,effSp),-1).applyQuaternion(camera.quaternion).normalize();
+  if(w.proj){ spawnPulse(camera.position.clone().add(dir.clone().multiplyScalar(.5)),dir); }
+  else { const hits=raycastEnemies(200,dir);
+   if(!hits.length){ const pr=raycastProps(200,dir); if(pr)damageProp(pr,w.dmg,dir); }
+   else { const pr=raycastProps(hits[0].t,dir); if(pr)damageProp(pr,w.dmg,dir); }
+   if(hits.length){ damageEnemy(hits[0].e,hits[0].crit?w.dmg*2:w.dmg,dir,hits[0].crit,hits[0].low); if(hits[0].crit)AU.tone(1400,1400,.06,'sine',.2); }
+   tracer(dir,hits.length?hits[0].t:60); }
+ }
+ if(player.ammo[k]===0)startReload(); updateHUD();
+}
+function raycastEnemies(range,dir){
+ const d=dir||V3(0,0,-1).applyQuaternion(camera.quaternion).normalize();
+ const rc=new THREE.Raycaster(camera.position,d,0,range);
+ const out=[];
+ for(const e of enemies){ if(e.hp<=0)continue;
+  const t=rc.ray.distanceToPoint(e.mesh.position.clone().add(V3(0,e.hitH||.7,0)));
+  if(t<e.radius){ const along=e.mesh.position.clone().sub(camera.position).dot(d); if(along>0){
+   const hp=camera.position.clone().add(d.clone().multiplyScalar(along));
+   out.push({e,t:along,dir:d,crit:hp.y>e.mesh.position.y+(e.critY??999),low:hp.y<e.mesh.position.y+2.5}); } } }
+ out.sort((a,b)=>a.t-b.t); return out;
+}
+function raycastProps(range,dir){
+ const d=dir||V3(0,0,-1).applyQuaternion(camera.quaternion).normalize();
+ let best=null,bd=range;
+ for(const p of props){ const t=p.mesh.position.clone().sub(camera.position);
+  const along=t.dot(d); if(along<0||along>bd)continue;
+  if(t.clone().sub(d.clone().multiplyScalar(along)).length()<Math.max(p.half.x,p.half.z)+.3){best=p;bd=along;} }
+ return best;
+}
+function tracer(dir,dist){
+ const g=new THREE.BufferGeometry().setFromPoints([camera.position.clone().add(dir.clone().multiplyScalar(.6)),camera.position.clone().add(dir.clone().multiplyScalar(dist))]);
+ const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xffcc66,transparent:true,opacity:.7}));
+ levelGroup.add(l); setTimeout(()=>levelGroup.remove(l),50);
+}
+function spawnPulse(pos,dir){
+ const m=new THREE.Mesh(new THREE.SphereGeometry(.09,8,8),new THREE.MeshStandardMaterial({color:0x88ddff,emissive:0x33aaff,emissiveIntensity:3}));
+ m.position.copy(pos); levelGroup.add(m);
+ projectiles.push({mesh:m,vel:dir.clone().multiplyScalar(40),life:2,friendly:true});
+}
+function gravPrimary(){ // pull/punt
+ if(player.heldProp){ // punt it
+  const p=player.heldProp; p.held=false; player.heldProp=null;
+  p.vel.copy(V3(0,0,-16).applyQuaternion(camera.quaternion)); p.vel.y+=1.5; AU.shoot('gravfire'); player.fireCd=.5; player.swingT=.3; player.heat=1; return; }
+ const pr=raycastProps(6);
+ if(pr){ pr.held=true; player.heldProp=pr; AU.shoot('grav'); player.fireCd=.4; }
+ else { AU.shoot('grav'); player.fireCd=.4; }
+}
+function gravAlt(){ gravPrimary(); }
+function useKey(){ if(player.weapon==='grav'){gravPrimary();return;}
+ // use: pickups in reach get collected by proximity anyway; reserved for chapter interactables
+ if(interactables.length){ const d=V3(0,0,-1).applyQuaternion(camera.quaternion);
+  for(const it of interactables){ const to=it.pos.clone().sub(player.pos);
+   // proximity use: horizontal reach + vertical tolerance (deck heights vary)
+   if(Math.hypot(to.x,to.z)<3.2&&Math.abs(to.y)<3.5){ it.fn(); break; } } }
+}
+let interactables=[];
+
+// ============================================================= ENEMIES
+function damageEnemy(e,dmg,dir,crit,low){
+ if(e.kind==='strider'&&low&&!e.dead){ e.legStag=(e.legStag||0)+1;
+  AU.tone(2200,900,.05,'square',.12); // servo spark
+  if(e.legStag>=3){ e.legStag=0; e.stagger=Math.max(e.stagger||0,1.2);
+   showMsg('LEG SERVOS HIT - the Strider staggers'); AU.boom(); shake(.2); } }
+ e.hp-=dmg; e.flash=.12; hitmark(crit);
+ if(e.kind==='soldier'){ e.dodgeT=.55; e.strafe=Math.random()<.5?1:-1; }
+ if(e.kind!=='strider'&&!(e.flinch>0))e.flinch=Math.min(.12+dmg*.004,.32);
+ if(crit&&e.kind==='strider'&&!e.dead){ e.stagger=1.6; AU.tone(300,90,.5,'sawtooth',.3); showMsg('STRIDER STAGGERED - eye hit!'); }
+ if(e.kind==='strider'&&!e.dead){ const maxHp=900*(1+currentChapter*.12);
+  if(!e.stage2&&e.hp<maxHp*.5){ e.stage2=true; e.speed*=.65;
+   showMsg('STRIDER LIMPING - leg assembly damaged'); AU.boom(); shake(.3); }
+  if(!e.stage3&&e.hp<maxHp*.25){ e.stage3=true; e.speed*=.6;
+   showMsg('STRIDER CRITICAL - finish it'); AU.boom(); shake(.4); } }
+ if(dir){ e.mesh.position.addScaledVector(dir,.06); }
+ if(e.hp<=0)killEnemy(e,dir);
+ updateHUD();
+}
+let killCount=0, chapterKills=0, chapterT0=performance.now();
+function killEnemy(e,dir){
+ e.dead=true; AU.hit(); killCount++; chapterKills++; window._hitstop=Math.max(window._hitstop||0,.05); AU.tone(190,70,.14,'sine',.22);
+ if(e.kind==='soldier'){ AU.tone(820,380,.28,'square',.16); AU.noise(.12,.2,2200); } // combine flatline chirp
+ e.deadV=dir?dir.clone().normalize().multiplyScalar(3.6).add(V3(0,2.8,0)):null;
+ e.deadSpin=rand(4,9);
+ // drop chance
+ if(Math.random()<.35){ const pool=currentChapter>=3?['health','ammo_pulse','ammo_pulse','ammo_smg','suit']:['health','ammo_pistol','ammo_smg'];
+  const k=pool[Math.floor(Math.random()*pool.length)];
+  makePickup(e.mesh.position.x,e.mesh.position.y+.4,e.mesh.position.z,k,k==='health'?15:k==='suit'?10:k==='ammo_pulse'?30:12); }
+ // ragdoll-ish: tip over and fade
+ e.deadT=0;
+}
+function spawnHeadcrab(x,z){ const g=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),mat(0x9a7b4f,.9)); body.scale.y=.6; g.add(body);
+ for(let i=0;i<4;i++){ const leg=box(.04,.02,.22,0x7a5f3a,Math.cos(i*1.57)*.2,0,Math.sin(i*1.57)*.2); leg.rotation.y=i*1.57; g.add(leg); }
+ g.position.set(x,groundY(x,z)+.2,z); g.castShadow=true; levelGroup.add(g);
+ enemies.push({kind:'headcrab',faction:'xen',mesh:g,hp:25,radius:.4,hitH:.1,critY:.05,speed:3.4,dmg:8,state:'idle',t:0,atkCd:0});
+}
+function spawnZombie(x,z){ const g=new THREE.Group();
+ const torso=box(.5,.7,.3,0x6a5a48,0,.9,0,mat(0x6a5a48,.95)); g.add(torso);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.16,8,8),mat(0xb59a70,.9)); head.position.set(0,1.4,0); g.add(head);
+ const crab=new THREE.Mesh(new THREE.SphereGeometry(.14,8,6),mat(0x9a7b4f,.9)); crab.scale.y=.6; crab.position.set(0,1.55,.05); g.add(crab);
+ const armL=box(.12,.6,.12,0x6a5a48,-.35,1.0,.15,mat(0x6a5a48,.95)); armL.rotation.x=-1.2; g.add(armL);
+ const armR=armL.clone(); armR.position.x=.35; g.add(armR);
+ const legL=box(.16,.55,.16,0x4a4038,-.15,.3,0,mat(0x4a4038,.95)); g.add(legL);
+ const legR=legL.clone(); legR.position.x=.15; g.add(legR);
+ g.position.set(x,groundY(x,z),z); g.castShadow=true; levelGroup.add(g);
+ enemies.push({kind:'zombie',faction:'xen',mesh:g,hp:90,radius:.55,hitH:.9,critY:1.35,speed:1.5,dmg:18,state:'idle',t:0,atkCd:0});
+}
+function spawnSoldier(x,z){ const g=new THREE.Group();
+ const torso=box(.45,.6,.28,0xdfe4ea,0,.95,0,mat(0xdfe4ea,.6,.3)); g.add(torso); // combine white armor
+ const vest=box(.4,.3,.3,0x2a2f38,0,.95,.02,mat(0x2a2f38,.7)); g.add(vest);
+ const helm=new THREE.Mesh(new THREE.SphereGeometry(.15,10,8),mat(0xe8ecf2,.4,.4)); helm.position.set(0,1.42,0); g.add(helm);
+ const visor=box(.16,.05,.02,0x2266ff,0,1.42,.14,new THREE.MeshStandardMaterial({color:0x2266ff,emissive:0x1144ff,emissiveIntensity:2})); g.add(visor);
+ const gun=box(.06,.08,.5,0x22262c,.2,1.0,.25,mat(0x22262c,.4,.8)); g.add(gun);
+ const legL=box(.15,.6,.15,0xd0d5dd,-.12,.35,0,mat(0xd0d5dd,.6)); g.add(legL);
+ const legR=legL.clone(); legR.position.x=.12; g.add(legR);
+ g.position.set(x,groundY(x,z),z); g.castShadow=true; levelGroup.add(g);
+ enemies.push({kind:'soldier',faction:'combine',mesh:g,hp:60,radius:.5,hitH:1.0,critY:1.3,speed:3.0,dmg:6,state:'idle',t:0,atkCd:rand(1,2),strafe:Math.random()<.5?1:-1,standoff:rand(9,17)});
+}
+function spawnHunter(x,z){ const g=new THREE.Group();
+ const body=box(.6,.5,.9,0x3a6a4a,0,1.3,0,mat(0x3a6a4a,.7,.3)); g.add(body);
+ const eye=new THREE.Mesh(new THREE.SphereGeometry(.07,8,8),new THREE.MeshStandardMaterial({color:0x66ffcc,emissive:0x22ffaa,emissiveIntensity:2.5})); eye.position.set(0,1.35,.48); g.add(eye);
+ for(const s of [-1,1]){ const legF=box(.09,.9,.09,0x2a4a3a,s*.22,.6,.28,mat(0x2a4a3a,.7)); legF.rotation.x=.25*s; g.add(legF);
+  const legB=box(.09,.9,.09,0x2a4a3a,s*.22,.6,-.28,mat(0x2a4a3a,.7)); legB.rotation.x=-.25*s; g.add(legB); }
+ g.position.set(x,groundY(x,z),z); g.castShadow=true; levelGroup.add(g);
+ enemies.push({flank:Math.random()<.5?1:-1,kind:'hunter',faction:'combine',mesh:g,hp:120,radius:.7,hitH:1.2,critY:1.05,speed:5.5,dmg:14,state:'idle',t:0,atkCd:0,strafe:1});
+}
+function spawnStrider(x,z){ const g=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.SphereGeometry(1.1,12,10),mat(0x4a5568,.5,.5)); body.scale.set(1.4,.8,1.1); body.position.y=6.5; g.add(body);
+ const gun=box(.3,.3,1.6,0x2a323c,0,6.2,.9,mat(0x2a323c,.4,.8)); g.add(gun);
+ const eye=new THREE.Mesh(new THREE.SphereGeometry(.16,8,8),new THREE.MeshStandardMaterial({color:0x66aaff,emissive:0x2266ff,emissiveIntensity:3})); eye.position.set(0,6.7,1.15); g.add(eye);
+ for(let i=0;i<3;i++){ const a=i/3*Math.PI*2+.5;
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(.09,.05,7,6),mat(0x39424e,.6,.5));
+  leg.position.set(Math.cos(a)*2.2,3.2,Math.sin(a)*2.2); leg.rotation.z=Math.cos(a)*.5; leg.rotation.x=-Math.sin(a)*.5; g.add(leg); }
+ g.position.set(x,groundY(x,z),z); g.castShadow=true; levelGroup.add(g);
+ enemies.push({kind:'strider',faction:'combine',mesh:g,hp:900,radius:1.6,hitH:6.4,critY:5.9,speed:2.2,dmg:30,state:'idle',t:0,atkCd:3,boss:true});
+}
+function spawnManhack(x,y,z){ const g=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.SphereGeometry(.18,10,8),mat(0x9aa4ae,.4,.8)); g.add(body);
+ const rotor=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.02,10),mat(0x555c66,.4,.7)); rotor.position.y=.16; g.add(rotor);
+ const eye=new THREE.Mesh(new THREE.SphereGeometry(.05,6,6),new THREE.MeshStandardMaterial({color:0xff3333,emissive:0xff2222,emissiveIntensity:2})); eye.position.set(0,0,.17); g.add(eye);
+ g.position.set(x,y,z); levelGroup.add(g);
+ enemies.push({kind:'manhack',faction:'feral',mesh:g,hp:20,radius:.35,hitH:0,critY:.1,speed:6,dmg:8,state:'idle',t:0,atkCd:0,fly:true,baseY:y,rotor});
+}
+function spawnGorilla(x,z){ const g=new THREE.Group();
+ const torso=box(1.1,.9,.8,0x5a6a4a,0,1.3,0,mat(0x5a6a4a,.9)); g.add(torso);
+ const head=box(.5,.4,.5,0x4a5a3e,0,1.9,.3,mat(0x4a5a3e,.9)); g.add(head);
+ for(const sx of[-1,1]){ const arm=box(.28,1.3,.28,0x52614a,sx*.75,.9,.2,mat(0x52614a,.9)); arm.rotation.x=-.4; g.add(arm);
+  const leg=box(.3,.7,.3,0x424f38,sx*.35,.35,0,mat(0x424f38,.9)); g.add(leg); }
+ const eyeM=new THREE.MeshStandardMaterial({color:0xaaffdd,emissive:0x44ffaa,emissiveIntensity:2});
+ for(const sx of[-1,1]){ const e2=new THREE.Mesh(new THREE.SphereGeometry(.05,6,6),eyeM); e2.position.set(sx*.12,1.95,.56); g.add(e2); }
+ g.position.set(x,groundY(x,z),z); g.castShadow=true; levelGroup.add(g);
+ enemies.push({kind:'gorilla',faction:'xen',mesh:g,hp:260,radius:.9,hitH:1.3,critY:1.7,speed:4.4,dmg:26,state:'idle',t:0,atkCd:0});
+}
+function spawnSwooper(x,y,z){ const g=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.ConeGeometry(.25,.9,6),mat(0x6a5a7a,.8)); body.rotation.x=Math.PI/2; g.add(body);
+ for(const sx of[-1,1]){ const wing=new THREE.Mesh(new THREE.PlaneGeometry(1.1,.4),new THREE.MeshStandardMaterial({color:0x7a6a8a,side:THREE.DoubleSide,transparent:true,opacity:.85}));
+  wing.position.set(sx*.6,.05,0); wing.rotation.z=sx*.2; g.add(wing); }
+ const eye=new THREE.Mesh(new THREE.SphereGeometry(.06,6,6),new THREE.MeshStandardMaterial({color:0xffcc44,emissive:0xffaa22,emissiveIntensity:2.5})); eye.position.set(0,0,.45); g.add(eye);
+ g.position.set(x,y,z); levelGroup.add(g);
+ enemies.push({kind:'swooper',faction:'xen',mesh:g,hp:40,radius:.45,hitH:0,critY:0,speed:7,dmg:12,state:'idle',t:0,atkCd:0,fly:true,baseY:y});
+}
+function spawnAdvisor(x,y,z){ const g=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.SphereGeometry(1.0,14,12),mat(0x7a6a60,.85)); body.scale.set(1,.75,1.35); g.add(body);
+ const mouth=new THREE.Mesh(new THREE.CylinderGeometry(.12,.22,.5,8),mat(0x4a3f38,.9)); mouth.rotation.x=Math.PI/2; mouth.position.set(0,-.1,1.3); g.add(mouth);
+ const ringM=mat(0x3a424c,.4,.7);
+ for(let q=0;q<3;q++){ const ring=new THREE.Mesh(new THREE.TorusGeometry(1.05,.09,8,20),ringM);
+  ring.rotation.x=Math.PI/2+q*.4; ring.rotation.y=q*.7; g.add(ring); }
+ const eye=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),new THREE.MeshStandardMaterial({color:0x88ffcc,emissive:0x33ffaa,emissiveIntensity:2}));
+ eye.position.set(0,.15,1.25); g.add(eye);
+ const pod=new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.3,.5,14),mat(0x2a323c,.4,.7)); pod.position.y=-.7; g.add(pod);
+ g.position.set(x,y,z); levelGroup.add(g);
+ enemies.push({kind:'advisor',faction:'combine',mesh:g,hp:550,radius:1.2,hitH:0,critY:.1,speed:1.8,dmg:18,state:'idle',t:0,atkCd:2,fly:true,baseY:y,eye});
+}
+function hitTarget(T,dmg,from){ if(T.isPlayer)hurtPlayer(dmg,from); else if(T.e&&!T.e.dead)damageEnemy(T.e,dmg,V3(rand(-1,1),0,rand(-1,1))); }
+function explodeProp(p){
+ if(p.dead)return; p.dead=true;
+ AU.boom(); shake(.5);
+ const fp=new THREE.Mesh(new THREE.SphereGeometry(1.4,10,8),new THREE.MeshBasicMaterial({color:0xff8833,transparent:true,opacity:.85}));
+ fp.position.copy(p.mesh.position); levelGroup.add(fp);
+ setTimeout(()=>levelGroup.remove(fp),220);
+ for(const e of enemies){ if(!e.dead){ const d=e.mesh.position.distanceTo(p.mesh.position); if(d<4.5)damageEnemy(e,70*(1-d/5),V3()); } }
+ const pd=player.pos.distanceTo(p.mesh.position); if(pd<4)hurtPlayer(35*(1-pd/4.5));
+ levelGroup.remove(p.mesh);
+}
+function updateThrown(dt){
+ for(let i=thrown.length-1;i>=0;i--){ const p=thrown[i];
+  p.vel.y-=13*dt; p.mesh.position.addScaledVector(p.vel,dt); p.mesh.rotation.x+=dt*7; p.t-=dt;
+  let done=false;
+  if(p.mesh.position.distanceTo(player.pos)<1&&!player.dead){ hitTarget({pos:player.pos,isPlayer:true},p.dmg,p.mesh.position); done=true; }
+  if(!done)for(const e of enemies){ if(e.dead)continue; if(e.mesh.position.distanceTo(p.mesh.position)<.9){ damageEnemy(e,p.dmg,null); done=true; break; } }
+  const pg=groundY(p.mesh.position.x,p.mesh.position.z);
+  if(p.mesh.position.y<pg+.2||p.t<=0||done){ if(!done){AU.noise(.1,.15,300,'lowpass');} levelGroup.remove(p.mesh); thrown.splice(i,1); } }
+}
+function updateEnemies(dt){
+ for(let i=enemies.length-1;i>=0;i--){ const e=enemies[i];
+  if(e.dead){ e.deadT+=dt;
+   if(e.deadV){ e.mesh.position.addScaledVector(e.deadV,dt); e.deadV.y-=14*dt;
+    const gy2=groundY(e.mesh.position.x,e.mesh.position.z)+.2;
+    if(e.mesh.position.y<gy2){ e.mesh.position.y=gy2; e.deadV.y*=-.25; e.deadV.x*=.6; e.deadV.z*=.6;
+     if(Math.abs(e.deadV.y)<1)e.deadV=null; }
+    e.mesh.rotation.x+=e.deadSpin*dt; e.mesh.rotation.z+=e.deadSpin*.7*dt; }
+   else { e.mesh.rotation.x=Math.min(e.deadT*3,1.5); e.mesh.position.y-=dt*.3; }
+   if(e.deadT>1.6){ levelGroup.remove(e.mesh); enemies.splice(i,1);} continue; }
+  if(e.flash>0){ e.flash-=dt; e.mesh.traverse(o=>{if(o.material&&o.material.emissive)o.material.emissiveIntensity=e.flash>0?1:.0;}); }
+  if(e.flinch>0){ e.flinch-=dt; e.mesh.rotation.z=e.flinch>0?Math.sin(e.flinch*46)*.16:0; continue; }
+  // faction targeting: nearest hostile (other faction, or feral vs all) within range beats the player
+  let T={pos:player.pos,isPlayer:true,e:null};
+  let bestD=e.mesh.position.distanceTo(player.pos);
+  for(const o of enemies){ if(o===e||o.dead)continue;
+   const hostile=(e.faction!==o.faction)||e.faction==='feral'||o.faction==='feral';
+   if(!hostile)continue;
+   const d=o.mesh.position.distanceTo(e.mesh.position);
+   if(d<bestD&&d<15){ bestD=d; T={pos:o.mesh.position.clone().add(V3(0,o.hitH||.6,0)),isPlayer:false,e:o}; } }
+  const toP=T.pos.clone().sub(e.mesh.position); toP.y=0; const dist=toP.length(); const dir=toP.clone().normalize();
+  e.t+=dt;
+  if(e.fly){ // manhack + swooper movement
+   if(e.kind==='advisor'){
+    const to=T.pos.clone().sub(e.mesh.position); const dl=to.length();
+    e.mesh.rotation.y=Math.atan2(to.x,to.z);
+    if(dl>9)e.mesh.position.addScaledVector(to.normalize(),e.speed*dt);
+    e.mesh.position.y=e.baseY+Math.sin(e.t*1.2)*.4;
+    e.atkCd-=dt;
+    if(e.atkCd<1&&e.atkCd>0){ e.eye.material.emissiveIntensity=6;
+     if(Math.random()<dt*8)AU.tone(400,1400,.3,'sine',.08); }
+    if(e.atkCd<=0&&Math.random()<.45&&props.length){ // telekinesis: rip a prop and hurl it
+     let bp=null,bd=144;
+     for(const p of props){ if(p===player.heldProp)continue; const d2=p.mesh.position.distanceToSquared(e.mesh.position); if(d2<bd){bd=d2;bp=p;} }
+     if(bp){ e.atkCd=4; props.splice(props.indexOf(bp),1);
+      const tv=T.pos.clone().sub(bp.mesh.position).normalize().multiplyScalar(11); tv.y+=3;
+      thrown.push({mesh:bp.mesh,vel:tv,dmg:14,t:4});
+      AU.tone(200,800,.4,'sawtooth',.2); showMsg('The Advisor rips debris at you.'); continue; } }
+    if(e.atkCd<=0){ e.atkCd=4; e.eye.material.emissiveIntensity=2;
+     const from=e.mesh.position.clone();
+     for(let arc=0;arc<3;arc++){ const pts=[from];
+      for(let q=1;q<5;q++){ const f=q/5; pts.push(from.clone().lerp(T.pos,f).add(V3(rand(-1,1),rand(-1,1),rand(-1,1)))); }
+      pts.push(T.pos.clone());
+      const lg=new THREE.BufferGeometry().setFromPoints(pts);
+      const ll=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0x88ddff,transparent:true,opacity:.9}));
+      levelGroup.add(ll); setTimeout(()=>levelGroup.remove(ll),300); }
+     AU.tone(1600,200,.5,'sawtooth',.35); AU.noise(.4,.3,600);
+     const dodged=dl>15||Math.abs(T.vel?T.vel.x:0)+Math.abs(T.vel?T.vel.z:0)>7;
+     if(!dodged&&dl<15){ hitTarget(T,e.dmg,e.mesh.position); shake(.5); }
+     else if(dl<17)showMsg('You break the Advisor\'s psychic grip.'); }
+    continue;
+   }
+   if(dist<26){
+    const tgt=T.pos.clone();
+    if(e.kind==='manhack'){ tgt.y=Math.max(tgt.y-.3,groundY(e.mesh.position.x,e.mesh.position.z)+1.2);
+     const to=tgt.clone().sub(e.mesh.position); const dl=to.length();
+     if(dl>.5)e.mesh.position.addScaledVector(to.normalize(),e.speed*dt);
+     e.mesh.position.y+=Math.sin(e.t*6)*.15*dt*8;
+     if(e.rotor)e.rotor.rotation.y+=dt*40;
+     if(e.mesh.position.distanceTo(T.pos)<.8&&e.atkCd<=0){ e.atkCd=.9; hitTarget(T,e.dmg,e.mesh.position); AU.noise(.1,.3,3500,'highpass'); }
+    } else { // swooper: orbit then dive
+     e.atkCd-=dt;
+     if(e.atkCd>0){ const orb=V3(Math.cos(e.t*1.5)*7,4.5,Math.sin(e.t*1.5)*7).add(T.pos); orb.y=Math.max(orb.y,3);
+      const to=orb.clone().sub(e.mesh.position); if(to.length()>.5)e.mesh.position.addScaledVector(to.normalize(),e.speed*.7*dt); }
+     else { const to=T.pos.clone().sub(e.mesh.position);
+      if(to.length()>1)e.mesh.position.addScaledVector(to.normalize(),e.speed*1.4*dt);
+      else { hitTarget(T,e.dmg,e.mesh.position); e.atkCd=2.2; } }
+     e.mesh.rotation.y=Math.atan2(T.pos.x-e.mesh.position.x,T.pos.z-e.mesh.position.z);
+    }
+    if(Math.random()<dt*.5)AU.tone(1800,900,.1,'sine',.05);
+   }
+   if(e.atkCd>0&&e.kind==='manhack')e.atkCd-=dt;
+   continue;
+  }
+  if(e.kind==='headcrab'){
+   if(dist<14){ e.state='hunt';
+    if(e.atkCd>0)e.atkCd-=dt;
+    if(dist>2.2){ e.mesh.position.addScaledVector(dir,e.speed*dt); }
+    else if(e.atkCd<=0){ // leap
+     e.atkCd=1.4; AU.headcrab();
+     const leap=dir.clone().multiplyScalar(6); leap.y=3.5; e.leapV=leap; }
+   }
+   if(e.leapV){ e.mesh.position.addScaledVector(e.leapV,dt); e.leapV.y-=12*dt;
+    if(e.mesh.position.y<=groundY(e.mesh.position.x,e.mesh.position.z)+.2){ e.leapV=null; e.mesh.position.y=groundY(e.mesh.position.x,e.mesh.position.z)+.2; }
+    if(e.mesh.position.distanceTo(T.pos)<.9){ hitTarget(T,e.dmg,e.mesh.position); e.leapV=null; } }
+  } else if(e.kind==='zombie'){
+   if(e.throwCd>0)e.throwCd-=dt;
+   if(dist>4&&dist<12&&e.throwCd<=0){ e.throwCd=rand(4,7); AU.zombie();
+    const tm=box(.4,.4,.4,0x6a5a48,e.mesh.position.x,e.mesh.position.y+1.4,e.mesh.position.z,mat(0x6a5a48,.8));
+    levelGroup.add(tm);
+    const tv=T.pos.clone().sub(tm.position).normalize().multiplyScalar(9); tv.y+=4.5;
+    thrown.push({mesh:tm,vel:tv,dmg:e.dmg*1.2,t:4}); }
+   if(dist<12){ if(Math.random()<dt*.3)AU.zombie();
+    if(dist>1.4){ e.mesh.position.addScaledVector(dir,e.speed*dt); e.mesh.rotation.y=Math.atan2(dir.x,dir.z); }
+    else if(e.atkCd<=0){ e.atkCd=1.2; hitTarget(T,e.dmg,e.mesh.position); }
+   }
+   if(e.atkCd>0)e.atkCd-=dt;
+  } else if(e.kind==='soldier'){
+   if(dist<30){ e.mesh.rotation.y=Math.atan2(dir.x,dir.z);
+    // hold a personal standoff ring; dash-sidestep when hit
+    if(e.dodgeT>0)e.dodgeT-=dt;
+    const so=e.standoff||12;
+    if(dist>so+3)e.mesh.position.addScaledVector(dir,e.speed*dt);
+    else if(dist<so-3)e.mesh.position.addScaledVector(dir,-e.speed*.7*dt);
+    const smul=e.dodgeT>0?2.4:.6;
+    const side=V3(-dir.z,0,dir.x).multiplyScalar(e.strafe*e.speed*smul*dt); e.mesh.position.add(side);
+    if(Math.random()<dt*(e.dodgeT>0?1.5:.2))e.strafe*=-1;
+    e.atkCd-=dt;
+    if(e.burst>0){ e.burstT-=dt;
+     if(e.burstT<=0){ e.burstT=.11; e.burst--; AU.soldier();
+      const acc=clamp(1-dist/30,.2,.85)*(currentChapter===1?1-(chapterData.gustF||0)*.5:1);
+      if(Math.random()<acc)hitTarget(T,e.dmg,e.mesh.position);
+      tracerFrom(e.mesh.position.clone().add(V3(0,1.0,0)),T.pos.clone().add(V3(rand(-.8,.8),rand(-.6,.3),rand(-.8,.8)))); } }
+    else if(e.atkCd<=0&&dist<26){ e.atkCd=rand(1.1,2.1); e.burst=(currentChapter<2?2:3)+(Math.random()<.4?1:0); e.burstT=0; }
+   }
+  } else if(e.kind==='hunter'){
+   if(dist<28){ e.mesh.rotation.y=Math.atan2(dir.x,dir.z);
+    // flank: circle wide at mid range, commit inside 6m
+    if(dist>6&&dist<18&&e.atkCd>-1){ const perp=V3(-dir.z,0,dir.x).multiplyScalar(e.flank||1);
+     e.mesh.position.addScaledVector(dir,e.speed*.45*dt); e.mesh.position.addScaledVector(perp,e.speed*.8*dt);
+     if(Math.random()<dt*.15)e.flank*=-1; }
+    else if(dist>3){ e.mesh.position.addScaledVector(dir,e.speed*dt); }
+    e.atkCd-=dt;
+    if(dist<3&&e.atkCd<=0){ e.atkCd=1.0; hitTarget(T,e.dmg,e.mesh.position); }
+    else if(dist<14&&e.atkCd<=-1){ e.atkCd=2.4;
+     // flechette burst: 3 darts, slight spread, each can sting
+     for(let f=0;f<3;f++){ setTimeout(()=>{ if(e.dead)return; AU.shoot('smg');
+      if(Math.random()<.45)hitTarget(T,4,e.mesh.position);
+      tracerFrom(e.mesh.position.clone().add(V3(0,1.3,0)),T.pos.clone().add(V3(rand(-.9,.9),rand(-.4,.4),rand(-.9,.9)))); },f*130); } }
+   }
+  } else if(e.kind==='gorilla'){
+   if(dist<24){ e.mesh.rotation.y=Math.atan2(dir.x,dir.z);
+    e.atkCd-=dt;
+    if(e.leapV){ e.mesh.position.addScaledVector(e.leapV,dt); e.leapV.y-=16*dt;
+     if(e.mesh.position.y<=groundY(e.mesh.position.x,e.mesh.position.z)){ e.mesh.position.y=groundY(e.mesh.position.x,e.mesh.position.z); e.leapV=null; shake(.2); AU.boom(); }
+     if(e.mesh.position.distanceTo(T.pos)<1.4){ hitTarget(T,e.dmg,e.mesh.position); e.leapV=null; } }
+    else if(dist>3){ e.mesh.position.addScaledVector(dir,e.speed*dt);
+     if(dist<9&&e.atkCd<=0){ e.atkCd=2.4; e.leapV=dir.clone().multiplyScalar(9); e.leapV.y=5; AU.zombie(); } }
+    else if(e.atkCd<=0){ e.atkCd=1.4; hitTarget(T,e.dmg,e.mesh.position); shake(.3); }
+   }
+  } else if(e.kind==='strider'){
+   if(e.stagger>0){ e.stagger-=dt; e.mesh.rotation.z=Math.sin(e.stagger*8)*.08; e.atkCd=Math.max(e.atkCd,.4); continue; }
+   e.mesh.rotation.z=0;
+   if(dist<60){ e.mesh.rotation.y=Math.atan2(dir.x,dir.z);
+    if(dist>10)e.mesh.position.addScaledVector(dir,e.speed*dt);
+    e.atkCd-=dt;
+    if(e.atkCd<=0){ e.atkCd=4; // warp cannon: charge then blast
+     AU.stinger();
+     const gunPos=e.mesh.position.clone().add(V3(0,6.2,0));
+     const charge=new THREE.Mesh(new THREE.SphereGeometry(.4,10,8),new THREE.MeshBasicMaterial({color:0x88ccff,transparent:true,opacity:.9}));
+     charge.position.copy(gunPos); levelGroup.add(charge);
+     setTimeout(()=>{ if(!e.dead){ AU.boom(); levelGroup.remove(charge);
+      const bp=player.pos.clone();
+      for(let b=0;b<3;b++){ const lg=new THREE.BufferGeometry().setFromPoints([gunPos,bp.clone().add(V3(rand(-.5,.5),rand(-.5,.5),rand(-.5,.5)))]);
+       const ll=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0x66aaff,transparent:true,opacity:.95}));
+       levelGroup.add(ll); setTimeout(()=>levelGroup.remove(ll),400); }
+      if(player.pos.distanceTo(e.mesh.position)<20)hurtPlayer(e.dmg); shake(.6);} },1200); }
+   }
+  }
+  // gravity pull when dead handled above; keep on ground
+  if(!e.leapV&&!e.fly)e.mesh.position.y=groundY(e.mesh.position.x,e.mesh.position.z)+(e.kind==='headcrab'?.2:0);
+  // separation
+  for(const o of enemies){ if(o!==e&&!o.dead&&!e.dead){ const d=e.mesh.position.clone().sub(o.mesh.position); d.y=0;
+   const l=d.length(); if(l<1&&l>0.001)e.mesh.position.addScaledVector(d.normalize(),(1-l)*dt*3); } }
+ }
+}
+function tracerFrom(from,to){
+ const g=new THREE.BufferGeometry().setFromPoints([from,to]);
+ const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xcfe0ff,transparent:true,opacity:.9,blending:THREE.AdditiveBlending}));
+ levelGroup.add(l); setTimeout(()=>levelGroup.remove(l),60);
+}
+function updateProjectiles(dt){
+ for(let i=projectiles.length-1;i>=0;i--){ const pr=projectiles[i];
+  pr.life-=dt; pr.mesh.position.addScaledVector(pr.vel,dt);
+  let hit=false;
+  if(pr.friendly){ for(const e of enemies){ if(!e.dead&&e.mesh.position.clone().add(V3(0,e.hitH||.7,0)).distanceTo(pr.mesh.position)<e.radius+.15){ damageEnemy(e,22,pr.vel.clone().normalize()); hit=true; break; } } }
+  if(hit||pr.life<=0||pr.mesh.position.y<groundY(pr.mesh.position.x,pr.mesh.position.z)){ levelGroup.remove(pr.mesh); projectiles.splice(i,1); }
+ }
+}
+
+// ============================================================= CHAPTERS
+// Each chapter: build() populates levelGroup; objective text; win condition; onComplete -> next.
+const chapters = [
+ // ---------------- CH 1: WHITE FOREST OUTSKIRTS
+ { name:'CHAPTER 1', title:'WHITE FOREST OUTSKIRTS',
+  objective:'Follow Dog. Take back the crowbar.',
+  fog:[0x584a52,.011], sky:0x8a6a70, ambient:[0x8a8296,1.9], sun:[0xffa860,1.9,[60,18,-40]], scale:[110,130.8,146.8,164.8,196,220],
+  ground(){ return 0; },
+  build(){
+   const g=levelGroup;
+   // ground: pine forest floor
+   const gd=new THREE.Mesh(new THREE.PlaneGeometry(300,300,40,40),mat(0x3d4a35,.95));
+   gd.rotation.x=-Math.PI/2; gd.receiveShadow=true; g.add(gd);
+   // rolling terrain via displaced vertices
+   const pos=gd.geometry.attributes.position;
+   for(let i=0;i<pos.count;i++){ const x=pos.getX(i),y=pos.getY(i);
+    pos.setZ(i, Math.sin(x*.06)*Math.cos(y*.05)*1.6 + Math.sin(x*.15)*.4); }
+   gd.geometry.computeVertexNormals();
+   groundY=(x,z)=>Math.sin(x*.06)*Math.cos(-z*.05)*1.6+Math.sin(x*.15)*.4;
+   // pines (instanced)
+   const trunkG=new THREE.CylinderGeometry(.18,.3,3,6), leafG=new THREE.ConeGeometry(1.6,4.5,7);
+   const trunkM=mat(0x4a3a28,.95), leafM=mat(0x2c4530,.95);
+   const trunks=new THREE.InstancedMesh(trunkG,trunkM,140), leaves=new THREE.InstancedMesh(leafG,leafM,140);
+   const m4=new THREE.Matrix4();
+   for(let i=0;i<140;i++){ const a=Math.random()*6.28, r=12+Math.random()*120;
+    const x=Math.cos(a)*r, z=Math.sin(a)*r; const s=rand(.7,1.8); const y=groundY(x,z);
+    m4.makeScale(s,s,s); m4.setPosition(x,y+1.5*s,z); trunks.setMatrixAt(i,m4);
+    m4.setPosition(x,y+(3+2.2)*s,z); leaves.setMatrixAt(i,m4); }
+   trunks.castShadow=leaves.castShadow=true; g.add(trunks,leaves);
+   // wrecked rebel outpost: sandbags, a shack, crates
+   for(let i=0;i<10;i++)makeProp(rand(-4,4),groundY(0,-8)+.3,-8+rand(-3,3),.55,'crate');
+   const shack=new THREE.Group();
+   shack.add(box(4,2.4,.2,0x4a3c2c,0,1.2,-2,mat(0x4a3c2c,.9)));
+   shack.add(box(.2,2.4,4,0x4a3c2c,-2,1.2,0,mat(0x4a3c2c,.9)));
+   shack.add(box(.2,2.4,4,0x4a3c2c,2,1.2,0,mat(0x4a3c2c,.9)));
+   const roof=box(4.6,.15,4.6,0x33302a,0,2.5,0,mat(0x33302a,.9)); roof.rotation.z=.06; shack.add(roof);
+   shack.position.set(6,groundY(6,-14),-14); g.add(shack);
+   addCollider(6,groundY(6,-14),-14,4.4,2.5,4.4);
+   // DOG: big friendly robot intro - simple build, waves
+   const dog=new THREE.Group();
+   const dbody=box(1.4,1.2,1.8,0x8a8578,0,2.2,0,mat(0x8a8578,.5,.6)); dbody.material.emissive=new THREE.Color(0x2a2018); dbody.material.emissiveIntensity=.8; dog.add(dbody);
+   const dhead=box(.7,.5,.9,0x9a9588,0,3.0,.6,mat(0x9a9588,.5,.6)); dog.add(dhead);
+   const deye=new THREE.Mesh(new THREE.SphereGeometry(.12,8,8),new THREE.MeshStandardMaterial({color:0xffe080,emissive:0xffcc44,emissiveIntensity:2})); deye.position.set(0,3.05,1.05); dog.add(deye);
+   for(const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+    const leg=box(.22,2.0,.22,0x7a7568,sx*.7,1.0,sz*.7,mat(0x7a7568,.5,.6)); dog.add(leg); }
+   const cb=box(.06,.06,.8,0xb22222,0,2.6,1.3,mat(0xb22222,.5,.7)); cb.name='dogcrowbar'; dog.add(cb);
+   dog.position.set(0,groundY(0,-4),-4); dog.rotation.y=Math.PI; g.add(dog);
+   chapterData.dog=dog; chapterData.dogT=0;
+   // rebel radio on a crate by the shack - ambient chatter
+   const radio=new THREE.Group();
+   radio.add(box(.5,.3,.24,0x3a3f46,0,.15,0,mat(0x3a3f46,.5,.5)));
+   radio.add(box(.02,.5,.02,0x888,.2,.55,0,mat(0x888888,.4,.7)));
+   const rled=new THREE.Mesh(new THREE.SphereGeometry(.03,6,4),new THREE.MeshStandardMaterial({color:0x33ff66,emissive:0x22cc44,emissiveIntensity:2}));
+   rled.position.set(-.15,.22,.13); radio.add(rled);
+   radio.position.set(4.6,groundY(4.6,-12.6)+.9,-12.6); g.add(radio);
+   chapterData.radio={pos:radio.position.clone(),cd:0,line:0};
+   // intro crowbar pickup spawns after dog animation (onUpdate)
+   // enemies: headcrab packs + zombies
+   spawnHeadcrab(-6,-18); spawnHeadcrab(4,-22); spawnHeadcrab(-2,-26);
+   spawnZombie(8,-30); spawnZombie(-10,-34);
+   spawnHeadcrab(12,-38); spawnZombie(0,-44); spawnHeadcrab(-6,-48);
+   // pickups
+   makePickup(6,groundY(6,-14)+1.0,-13,'health',25);
+   makePickup(5,groundY(5,-14)+.8,-15,'ammo_pistol',36);
+   makePickup(-3,groundY(-3,-20)+.5,-20,'health',15);
+   makePickup(2,groundY(2,-36)+.5,-36,'suit',25);
+   makePickup(0,groundY(0,-52)+.5,-52,'cache');
+   // WHITE FOREST silo base at the exit (mood plate 9)
+   const silo=new THREE.Group();
+   silo.add(new THREE.Mesh(new THREE.CylinderGeometry(3,3.4,26,12),mat(0x8a8d90,.7,.5)));
+   silo.children[0].position.y=13;
+   const dome=new THREE.Mesh(new THREE.SphereGeometry(3,12,8,0,Math.PI*2,0,Math.PI/2),mat(0x7a7d80,.7,.5));
+   dome.position.y=26; silo.add(dome);
+   const stripe=new THREE.Mesh(new THREE.CylinderGeometry(3.05,3.05,1.2,12),mat(0xb0622a,.8,.4));
+   stripe.position.y=20; silo.add(stripe);
+   const bunker=box(8,3,6,0x6a6d70,0,1.5,4,mat(0x6a6d70,.9,.3)); silo.add(bunker);
+   const doorGlow=new THREE.Mesh(new THREE.PlaneGeometry(1.6,2.4),
+    new THREE.MeshBasicMaterial({color:0xffc060}));
+   doorGlow.position.set(0,1.4,7.05); silo.add(doorGlow);
+   silo.position.set(10,groundY(10,-64),-64); g.add(silo);
+   addCollider(10,groundY(10,-64),-64,7,26,7);
+   // barrel fire by the shack: the warm note (mood plate 9)
+   const fireBarrel=new THREE.Mesh(new THREE.CylinderGeometry(.45,.45,1,10),mat(0x4a4a4c,.6,.7));
+   fireBarrel.position.set(3,groundY(3,-11)+.5,-11); g.add(fireBarrel);
+   const flame=new THREE.Mesh(new THREE.ConeGeometry(.35,1.1,8),
+    new THREE.MeshBasicMaterial({color:0xff9030,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+   flame.position.set(3,groundY(3,-11)+1.4,-11); g.add(flame);
+   const fireLight=new THREE.PointLight(0xff7020,10,12,1.6);
+   fireLight.position.set(3,groundY(3,-11)+1.6,-11); g.add(fireLight);
+   chapterData.campfire={flame,light:fireLight};
+   // dropship contrails in the dawn sky
+   for(const [cx,cy,cz,cr] of [[-40,38,-90,.3],[20,44,-120,-.2],[60,35,-80,.5]]){
+    const trail=new THREE.Mesh(new THREE.CylinderGeometry(.15,.6,30,6),
+     new THREE.MeshBasicMaterial({color:0xd8c8c0,transparent:true,opacity:.35}));
+    trail.rotation.z=Math.PI/2+cr; trail.position.set(cx,cy,cz); g.add(trail); }
+   // exit trigger
+   makeMotes(250,0xffd9a0,.09,18,{x:.5,y:-.25}); // dawn dust
+   chapterData.exitZ=-56; chapterData.waypoint=V3(0,2,-56);
+  },
+  onUpdate(dt){
+   const d=chapterData;
+   if(!d.wave&&player.pos.z<-30){ d.wave=true;
+    spawnHeadcrab(-2,-46); spawnHeadcrab(2,-48); spawnHeadcrab(1,-44); spawnZombie(0,-50); spawnZombie(-3,-44);
+    showMsg('HEADCRAB SHELL IMPACT - CONTACTS AHEAD'); AU.stinger(); AU.boom(); shake(.4); }
+   if(d.dog&&!d.crowbarGiven){ d.dogT+=dt;
+    d.dog.position.y=groundY(0,-4)+Math.abs(Math.sin(d.dogT*2))*.25; // happy bounce
+    d.dog.rotation.y=Math.PI+Math.sin(d.dogT*1.3)*.3;
+    if(player.pos.distanceTo(d.dog.position)<3.2){ d.crowbarGiven=true;
+     d.dog.remove(d.dog.getObjectByName('dogcrowbar'));
+     player.weapons.pistol=true;
+     showMsg('DOG RETURNS YOUR CROWBAR - and a USP MATCH. The resistance is counting on you.');
+     AU.stinger(); setObjective('Fight through the forest to the White Forest rail spur.');
+     equip('pistol');
+    }
+   }
+   // radio chatter when close
+   if(d.radio){ d.radio.cd-=dt;
+    if(player.pos.distanceTo(d.radio.pos)<4&&d.radio.cd<=0){ d.radio.cd=22;
+     const lines=['RADIO: "...White Forest actual, dropships inbound from the northeast. All outposts, weapons free..."',
+      'RADIO: "...rail spur is holding. If you read Freeman, tell him: the crowbar made it. Over."',
+      'RADIO: "...advisory: headcrab shells falling past the treeline. Keep your helmets on..."'];
+     showMsg(lines[d.radio.line%lines.length]); d.radio.line++;
+     for(let b=0;b<5;b++)AU.tone(1200,1200,.05,'sine',.12,b*.12); } }
+   // Dog tracks you and chirps
+   if(d.dog&&d.crowbarGiven){ d.dog.rotation.y=Math.atan2(player.pos.x-d.dog.position.x,player.pos.z-d.dog.position.z);
+    if(Math.random()<dt*.1&&player.pos.distanceTo(d.dog.position)<7){ AU.tone(520,780,.12,'square',.1); AU.tone(780,520,.1,'square',.08,.1); } }
+   if(d.campfire){ const fl=.8+Math.random()*.4;
+    d.campfire.flame.scale.set(fl,1+Math.random()*.5,fl);
+    d.campfire.light.intensity=8+Math.random()*5; }
+   if(player.pos.z<chapterData.exitZ)completeChapter();
+  } },
+ // ---------------- CH 2: THE FROZEN WASTES
+ { name:'CHAPTER 2', title:'THE FROZEN WASTES',
+  objective:'Reach the Arctic coordinates. Survive the blizzard.',
+  fog:[0xb8c8d8,.028], sky:0xaebfd0, ambient:[0x8fa4bc,.8], sun:[0xdfe8f0,.7,[20,50,10]], scale:[220,246.9,293.7,329.6,440], spawn:[-5,4,-.12],
+  build(){
+   const g=levelGroup;
+   const gd=new THREE.Mesh(new THREE.PlaneGeometry(320,320,44,44),mat(0xdde5ec,.9));
+   gd.rotation.x=-Math.PI/2; gd.receiveShadow=true; g.add(gd);
+   const pos=gd.geometry.attributes.position;
+   for(let i=0;i<pos.count;i++){ const x=pos.getX(i),y=pos.getY(i);
+    pos.setZ(i, Math.sin(x*.05)*Math.cos(y*.04)*2.2+Math.sin(x*.12+y*.07)*.7); }
+   gd.geometry.computeVertexNormals();
+   groundY=(x,z)=>Math.sin(x*.05)*Math.cos(-z*.04)*2.2+Math.sin(x*.12-z*.07)*.7;
+   // crashed seaplane
+   const plane=new THREE.Group();
+   plane.add(box(1.6,1.4,7,0x7a4a3a,0,1.2,0,mat(0x7a4a3a,.6,.4)));
+   const wing=box(9,.15,1.8,0x6a4030,0,1.8,-.5,mat(0x6a4030,.6,.4)); wing.rotation.z=.1; plane.add(wing);
+   plane.add(box(.2,2,1.6,0x6a4030,0,2.4,3.4,mat(0x6a4030,.6,.4)));
+   plane.rotation.z=.18; plane.position.set(4,groundY(4,-10),-10); g.add(plane);
+   addCollider(4,groundY(4,-10),-10,3,3,7);
+   // buoy lamp: the one warm note in the whiteout
+   const buoy=new THREE.Group();
+   buoy.add(new THREE.Mesh(new THREE.CylinderGeometry(.14,.22,2.6,7),mat(0x5a3a28,.9)));
+   const cage=new THREE.Mesh(new THREE.SphereGeometry(.34,10,8),
+    new THREE.MeshStandardMaterial({color:0xffb050,emissive:0xff8010,emissiveIntensity:3}));
+   cage.position.y=1.5; buoy.add(cage);
+   buoy.add(new THREE.Mesh(new THREE.ConeGeometry(.5,.4,7),mat(0x4a3020,.9))).children;
+   buoy.children[2].position.y=1.95;
+   const lampLight=new THREE.PointLight(0xff8030,14,16,1.6); lampLight.position.y=1.5; buoy.add(lampLight);
+   buoy.position.set(2.5,groundY(2.5,-4),-4); g.add(buoy); addCollider(2.5,groundY(2.5,-4),-4,.5,3,.5);
+   chapterData.buoyLamp={light:lampLight,cage};
+   // roped figures crossing the ice (mood plate: silhouettes on a line)
+   const ropeFig=(x,z)=>{ const f=new THREE.Group();
+    f.add(box(.5,1.1,.4,0x2a2c30,0,.55,0,mat(0x2a2c30,.95)));
+    f.add(box(.34,.34,.34,0x3a3428,0,1.3,0,mat(0x3a3428,.95)));
+    f.children[1].position.y=1.28;
+    f.position.set(x,groundY(x,z),z); g.add(f); return f; };
+   const rf1=ropeFig(-4,-16), rf2=ropeFig(-2.6,-18.5);
+   const ropeG=new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-4,groundY(-4,-16)+1,-16),new THREE.Vector3(-2.6,groundY(-2.6,-18.5)+1,-18.5)]);
+   g.add(new THREE.Line(ropeG,new THREE.LineBasicMaterial({color:0x444038})));
+   // ice rocks
+   const rockG=new THREE.IcosahedronGeometry(1,0);
+   const rocks=new THREE.InstancedMesh(rockG,mat(0xc8d4e0,.8,.1),60);
+   const m4=new THREE.Matrix4();
+   for(let i=0;i<60;i++){ const a=Math.random()*6.28,r=10+Math.random()*120;
+    const x=Math.cos(a)*r,z=Math.sin(a)*r,s=rand(.5,3);
+    m4.makeScale(s,s*.7,s); m4.setPosition(x,groundY(x,z)+s*.2,z); rocks.setMatrixAt(i,m4); }
+   rocks.castShadow=true; g.add(rocks);
+   // snow particles
+   makeSnow();
+   // SMG pickup in plane
+   makePickup(4,groundY(4,-10)+1.2,-9,'weapon'); chapterData.smgPickup=true;
+   makePickup(3,groundY(3,-11)+.8,-12,'ammo_smg',90);
+   makePickup(5,groundY(5,-9)+.8,-8,'health',25);
+   // combine patrols
+   spawnSoldier(-8,-24); spawnSoldier(6,-30); spawnSoldier(0,-38);
+   spawnManhack(-4,3,-28); spawnManhack(5,3,-42);
+   spawnHunter(-4,-44); spawnSoldier(10,-50); spawnHunter(8,-58);
+   spawnSoldier(-6,-62); spawnSoldier(2,-68);
+   makePickup(-2,groundY(-2,-34)+.5,-34,'ammo_shotgun',12); // shotgun found mid-chapter
+   makePickup(-2.5,groundY(-2.5,-34)+.6,-34,'weapon'); chapterData.shotgunPickup=true;
+   makePickup(0,groundY(0,-52)+.5,-52,'suit',25);
+   makePickup(1.5,groundY(1.5,-46)+.5,-46,'health',25);
+   makePickup(1,groundY(1,-72)+.5,-72,'cache');
+   chapterData.exitZ=-76; chapterData.waypoint=V3(0,2,-76);
+  },
+  onUpdate(dt){ const d=chapterData;
+   // blizzard gusts: visibility pulses + wind swells, snow drives sideways
+   d.gustT=(d.gustT||0)+dt;
+   d.gustF=Math.max(0,Math.sin(d.gustT*.23)+Math.sin(d.gustT*.09))*.5;
+   scene.fog.density=.028+d.gustF*.012;
+   if(d.gustF>.6&&Math.random()<dt*1.5)AU.noise(1.4,.05,700,'bandpass');
+   if(!d.wave2&&player.pos.z<-58){ d.wave2=true;
+    spawnSoldier(-3,-70); spawnSoldier(4,-72); spawnHunter(0,-66);
+    showMsg('COMBINE REINFORCEMENTS ON THE RIDGE'); AU.stinger(); }
+   // mid-chapter ambush: dropship flyover + hunter kill team
+   if(!d.ambush&&player.pos.z<-40){ d.ambush=true;
+    showMsg('DROPSHIP OVERHEAD - HUNTER KILL TEAM INBOUND'); AU.stinger();
+    spawnHunter(player.pos.x-4,player.pos.z-12); spawnHunter(player.pos.x+5,player.pos.z-10);
+    const ds=new THREE.Group();
+    ds.add(box(4,1.2,7,0x1a2028,0,0,0,mat(0x1a2028,.5,.6)));
+    ds.add(box(7,.4,2.5,0x222a34,0,.4,0,mat(0x222a34,.5,.6)));
+    const dl=new THREE.PointLight(0x66aaff,6,20); dl.position.y=-1; ds.add(dl);
+    ds.position.set(-40,26,player.pos.z-30); levelGroup.add(ds); d.dropship=ds; }
+   if(d.dropship){ d.dropship.position.x+=dt*22; d.dropship.position.z-=dt*6;
+    if(d.dropship.position.x>60){ levelGroup.remove(d.dropship); d.dropship=null; } }
+   if(player.pos.z<chapterData.exitZ)completeChapter(); } },
+ // ---------------- CH 3: THE BOREALIS
+ { name:'CHAPTER 3', title:'THE BOREALIS',
+  objective:'Board the ship. Find the Bootstrap Device.',
+  fog:[0x11161f,.009], sky:0x0a1018, ambient:[0x5c7089,1.8], sun:[0x99aac0,1.2,[-10,40,-30]], scale:[82.4,98,110,123.5,164.8],
+  build(){
+   const g=levelGroup;
+   // ice plain with pressure-ridge slabs
+   const gd=new THREE.Mesh(new THREE.PlaneGeometry(300,300,24,24),mat(0xb8c4d2,.85));
+   gd.rotation.x=-Math.PI/2; gd.receiveShadow=true; g.add(gd);
+   groundY=()=>0;
+   const slabs=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mat(0xcdd9e6,.7,.1),50);
+   const m4=new THREE.Matrix4();
+   for(let i=0;i<50;i++){ const a=Math.random()*6.28,r=14+Math.random()*90;
+    const x=Math.cos(a)*r,z=Math.sin(a)*r-40;
+    m4.makeScale(rand(1,4),rand(.3,1.2),rand(1,3)); m4.setPosition(x,rand(0,.3),z); slabs.setMatrixAt(i,m4); }
+   slabs.castShadow=true; g.add(slabs);
+   // distant ghost ships locked in the ice
+   for(const [hx,hz,hs] of [[-60,-120,1.6],[70,-140,2],[35,-115,1.1]]){
+    const gh=new THREE.Group();
+    gh.add(box(10*hs,5*hs,40*hs,0x8d9aa8,0,2.5*hs,0,mat(0x8d9aa8,.8,.2)));
+    gh.add(box(6*hs,4*hs,10*hs,0x9aa6b2,0,6*hs,4*hs,mat(0x9aa6b2,.8,.2)));
+    gh.position.set(hx,0,hz); g.add(gh); }
+   // THE BOREALIS - white/gray research icebreaker (USCGC Healy basis), heeled in the ridge
+   const ship=new THREE.Group();
+   const W=0xdde3e8, GY=0xc3ccd4;
+   const hull=box(14,6,60,W,0,3,0,mat(W,.55,.25)); ship.add(hull);
+   // red icebreaker band low on the hull
+   const band=box(14.25,.9,60.25,0xb03028,0,1.15,0,mat(0xb03028,.6,.2)); ship.add(band);
+   // flared icebreaking bow (aft = -z toward player start? bow faces -z, the direction of travel)
+   const bow=new THREE.Mesh(new THREE.ConeGeometry(5.4,12,4),mat(W,.55,.25));
+   bow.rotation.x=-Math.PI/2; bow.rotation.y=Math.PI/4; bow.position.set(0,2.6,-36); bow.scale.set(1.3,.55,1); ship.add(bow);
+   const bowBand=new THREE.Mesh(new THREE.ConeGeometry(5.55,12.2,4),mat(0xb03028,.6,.2));
+   bowBand.rotation.x=-Math.PI/2; bowBand.rotation.y=Math.PI/4; bowBand.position.set(0,1.15,-36); bowBand.scale.set(1.32,.16,1); ship.add(bowBand);
+   // faint diagonal coast-guard racing stripe under Aperture overpaint
+   for(const sx of [-1,1]){ const stripe=box(.06,.7,18,0x9a3a30,sx*7.05,2.6,6,mat(0x9a3a30,.7,.1));
+    stripe.rotation.x=.45; stripe.material.transparent=true; stripe.material.opacity=.55; ship.add(stripe); }
+   // blocky multi-level white superstructure amidships + bridge
+   const sup1=box(10,3.4,14,W,0,7.8,4,mat(W,.55,.25)); ship.add(sup1);
+   const sup2=box(8,2.6,9,GY,0,10.6,5,mat(GY,.55,.25)); ship.add(sup2);
+   const bridgeGlass=box(8.2,.9,9.2,0x1a2836,0,11.3,5,mat(0x1a2836,.3,.6)); ship.add(bridgeGlass);
+   // main mast forward of the bridge
+   const mast=box(.4,6,.4,0x8a949e,0,14,0,mat(0x8a949e,.5,.5)); ship.add(mast);
+   const yard=box(4,.2,.2,0x8a949e,0,15.5,0,mat(0x8a949e,.5,.5)); ship.add(yard);
+   const arrayDish=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.15,10),mat(0xaab4be,.4,.6));
+   arrayDish.rotation.x=.6; arrayDish.position.set(0,16.5,0); ship.add(arrayDish);
+   // helicopter deck + hangar aft
+   const heliPad=box(11,.3,12,GY,0,6.35,22,mat(GY,.6,.2)); ship.add(heliPad);
+   const padCircle=new THREE.Mesh(new THREE.TorusGeometry(2.4,.12,8,24),new THREE.MeshStandardMaterial({color:0xffdd66,emissive:0xcc9900,emissiveIntensity:.5}));
+   padCircle.rotation.x=Math.PI/2; padCircle.position.set(0,6.55,22); ship.add(padCircle);
+   const hangar=box(8,2.8,6,W,-2.2,7.8,14,mat(W,.55,.25)); ship.add(hangar);
+   // BOREALIS name on the bow (canvas texture, both sides)
+   const cnv=document.createElement('canvas'); cnv.width=512; cnv.height=80;
+   const cx=cnv.getContext('2d'); cx.fillStyle='rgba(0,0,0,0)'; cx.fillRect(0,0,512,80);
+   cx.font='bold 56px Courier New'; cx.fillStyle='#2a3644'; cx.textAlign='center';
+   cx.fillText('BOREALIS',256,58);
+   const nameTex=new THREE.CanvasTexture(cnv);
+   for(const sx of [-1,1]){ const np=new THREE.Mesh(new THREE.PlaneGeometry(8,1.25),
+    new THREE.MeshStandardMaterial({map:nameTex,transparent:true,roughness:.6}));
+    np.position.set(sx*7.08,4.6,-24); np.rotation.y=sx*Math.PI/2; ship.add(np); }
+   // Aperture logo amidships
+   const ap=new THREE.Mesh(new THREE.CircleGeometry(1.6,24),new THREE.MeshStandardMaterial({color:0x88ccff,emissive:0x3388cc,emissiveIntensity:1.2}));
+   ap.position.set(5.05,8.2,4); ap.rotation.y=Math.PI/2; ship.add(ap);
+   // warm portholes (ship power still running in patches)
+   const winM=new THREE.MeshStandardMaterial({color:0xffbb55,emissive:0xff9930,emissiveIntensity:1.8});
+   for(let zz=-24;zz<=26;zz+=3.4){ for(const sx of [-1,1]){
+    if(Math.random()<.35)continue; // patches, not full rows
+    const ph=new THREE.Mesh(new THREE.BoxGeometry(.1,.35,.5),winM); ph.position.set(sx*7.02,4.6,zz); ship.add(ph); } }
+   for(let i=0;i<6;i++){ const w=new THREE.Mesh(new THREE.BoxGeometry(.9,.5,.1),winM);
+    w.position.set(-3.4+i*1.4,8.2,-3.05); ship.add(w); }
+   for(let i=0;i<6;i++){ const w=new THREE.Mesh(new THREE.BoxGeometry(.8,.45,.1),winM);
+    w.position.set(-4.5+i*1.8,3.4,30.06); ship.add(w); }
+   // heel slightly in the pressure ridge
+   ship.rotation.z=.045; ship.rotation.x=.012;
+   ship.position.set(0,0,-45); g.add(ship);
+   // COMBINE COMPOUND around the ship: scaffolding clamped to the hull + tech grafts
+   const scafM=mat(0x2a323c,.6,.5);
+   for(const [sx,sz] of [[-11,-30],[11,-30],[-11,-58],[11,-58]]){
+    const leg1=box(.3,12,.3,0x2a323c,sx,6,sz,scafM); g.add(leg1);
+    const leg2=box(.3,12,.3,0x2a323c,sx,6,sz+6,scafM); g.add(leg2);
+    const beam=box(.25,.25,6,0x2a323c,sx,10,sz+3,scafM); g.add(beam);
+    const walk=box(2,.15,6.4,0x39434f,sx*.92,10.2,sz+3,mat(0x39434f,.6,.4)); g.add(walk); }
+   // glowing combine graft panels on the hull
+   for(const [px,py,pz] of [[-7.3,5,-30],[7.3,6,-46],[-7.3,4,-58],[7.3,7,-38]]){
+    const gp=box(.3,2.2,3,0x1c222a,px,py,pz,mat(0x1c222a,.4,.7)); g.add(gp);
+    const gl=box(.34,.3,2.2,0x44aaff,px,py+.6,pz,new THREE.MeshStandardMaterial({color:0x44aaff,emissive:0x2288ff,emissiveIntensity:1.8})); g.add(gl); }
+   // Advisors flanking: floating grub-pods
+   for(const ax of [-13,13]){
+    const adv=new THREE.Group();
+    const body=new THREE.Mesh(new THREE.SphereGeometry(1.1,12,10),mat(0x6a5a52,.8)); body.scale.set(1,.72,1.3); adv.add(body);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.5,.1,8,16),mat(0x8a8078,.5,.5)); ring.rotation.x=Math.PI/2; ring.position.z=1.1; adv.add(ring);
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(.12,8,8),new THREE.MeshStandardMaterial({color:0x88ffcc,emissive:0x33ffaa,emissiveIntensity:1.5})); eye.position.set(0,.1,1.35); adv.add(eye);
+    adv.position.set(ax,11,-44+rand(-4,4)); adv.userData.baseY=11; g.add(adv);
+    (chapterData.advisors=chapterData.advisors||[]).push(adv); }
+   // deck: gangway ramp up to the foredeck
+   const deck=new THREE.Mesh(new THREE.BoxGeometry(10,.4,54),mat(0x9aa6b2,.65,.3));
+   deck.position.set(0,6.2,-45); g.add(deck);
+   // snowdrifts on deck
+   for(let i=0;i<8;i++){ const drift=new THREE.Mesh(new THREE.SphereGeometry(rand(.5,1.1),8,6),mat(0xe8eef4,.9));
+    drift.scale.y=.35; drift.position.set(rand(-4,4),6.45,rand(-68,-22)); g.add(drift); }
+   // icicles under deck edges
+   for(let i=0;i<24;i++){ const ic=new THREE.Mesh(new THREE.ConeGeometry(.06,rand(.3,.8),5),mat(0xdde8f2,.4,.1));
+    ic.rotation.x=Math.PI; const sx=i%2?4.85:-4.85;
+    ic.position.set(sx,6.0,-20-i*2.2); g.add(ic); }
+   // railings
+   for(const sx of [-1,1]){ const rail=box(.08,1,54,0xb8c2cc,sx*4.9,7.2,-45,mat(0xb8c2cc,.5,.5)); g.add(rail); }
+   const ramp=box(3,.3,12,0x8a949e,0,3,-14,mat(0x8a949e,.7)); ramp.rotation.x=.5; g.add(ramp);
+   // BOREALIS life preservers scattered on deck
+   for(const [px,pz] of [[-3,-28],[2.5,-47],[-1.8,-63]]){
+    const lp=new THREE.Mesh(new THREE.TorusGeometry(.35,.11,8,18),mat(0xe8e4da,.7));
+    lp.rotation.x=Math.PI/2; lp.position.set(px,6.5,pz); g.add(lp);
+    for(let q=0;q<4;q++){ const seg=box(.12,.05,.12,0xb03028,px+Math.cos(q*1.57)*.35,6.56,pz+Math.sin(q*1.57)*.35,mat(0xb03028,.7)); g.add(seg); } }
+   // AFT ACCOMMODATION BLOCK: enclosed crew deck between gangway top and phase corridor
+   { const acM=mat(0xb8c2cc,.6,.35), acD=mat(0x8a949e,.65,.3);
+    for(const sx of [-1,1]) g.add(box(.3,3.2,17,0xb8c2cc,sx*4.85,8.0,-26.5,acM)); // side walls (hull colliders fence x=+-5)
+    g.add(box(10,.3,17.3,0x9aa6b2,0,9.65,-26.5,acD)); // ceiling
+    // stern + fore bulkheads with door frames (lane |x|<1.3 stays open)
+    for(const bz of [-18,-35]){
+     for(const sx of [-1,1]){ g.add(box(3.7,3.2,.5,0xb8c2cc,sx*3.15,8.0,bz,acM)); addCollider(sx*3.15,6.4,bz,3.7,3.2,.5); }
+     g.add(box(2.9,.9,.5,0x8a949e,0,9.1,bz,acD));
+     const dl=new THREE.Mesh(new THREE.PlaneGeometry(1.5,.3),new THREE.MeshStandardMaterial({color:0x88ff99,emissive:0x22cc55,emissiveIntensity:1.4}));
+     dl.position.set(0,8.55,bz+(bz===-18?-.3:.3)); g.add(dl); }
+    // portholes: cold daylight rings on both walls, a few dead
+    for(const pz of [-20.5,-24,-27.5,-31]){ for(const sx of [-1,1]){
+     const ring=new THREE.Mesh(new THREE.TorusGeometry(.34,.06,8,18),mat(0x7a848e,.4,.6));
+     ring.rotation.y=Math.PI/2; ring.position.set(sx*4.66,8.2,pz); g.add(ring);
+     if(Math.abs(pz*7+sx)%3>.4){ const pane=new THREE.Mesh(new THREE.CircleGeometry(.3,16),new THREE.MeshBasicMaterial({color:0xcfe2f2}));
+      pane.rotation.y=sx>0?-Math.PI/2:Math.PI/2; pane.position.set(sx*4.64,8.2,pz); g.add(pane); } } }
+    // overhead pipes + valve wheel
+    for(const [px,pr] of [[-4.2,.09],[-4.45,.07]]){
+     const pipe=new THREE.Mesh(new THREE.CylinderGeometry(pr,pr,16.6,8),mat(0x7a848e,.4,.6));
+     pipe.rotation.x=Math.PI/2; pipe.position.set(px,9.2,-26.5); g.add(pipe); }
+    const valve=new THREE.Mesh(new THREE.TorusGeometry(.16,.035,6,14),mat(0xb03028,.6,.3));
+    valve.position.set(-4.2,8.9,-22); g.add(valve);
+    // flickering corridor light + warm mess light
+    const fl7=new THREE.PointLight(0xcfe4ff,9,13,1.6); fl7.position.set(-1,9.1,-23); g.add(fl7);
+    chapterData.flicker=fl7;
+    const ml2=new THREE.PointLight(0xffc880,7,9,1.6); ml2.position.set(3,8.7,-26); g.add(ml2);
+    // mess table + benches + mugs (starboard)
+    g.add(box(1.9,.1,3.4,0x6a5a42,3.1,7.2,-26,mat(0x6a5a42,.8)));
+    for(const mz of [-27.3,-24.7]){ g.add(box(.12,1.0,.12,0x4a5560,2.5,6.7,mz,acD)); g.add(box(.12,1.0,.12,0x4a5560,3.7,6.7,mz,acD)); }
+    for(const bx2 of [1.9,4.3]) g.add(box(.45,.45,3.2,0x7a6a4e,bx2,6.62,-26,mat(0x7a6a4e,.85)));
+    addCollider(3.1,6.4,-26,3.0,1.4,3.9);
+    for(let q=0;q<4;q++){ const mug=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.09,8),mat(0xdde3e8,.5,.4));
+     mug.position.set(2.6+q*.35,7.3,-25-q*.5); g.add(mug); }
+    // bunk beds (port, fore of the hangar block)
+    for(const by of [6.62,7.7]){ g.add(box(1.3,.16,5.6,0x8a949e,-4.0,by,-22.5,acD));
+     g.add(box(1.2,.12,5.2,0x5a6a72,-4.0,by+.14,-22.5,mat(0x5a6a72,.9))); }
+    addCollider(-4.0,6.4,-22.5,1.5,2.4,5.8);
+    // scattered papers + fire extinguisher by the stern door
+    for(let q=0;q<7;q++){ const pp=new THREE.Mesh(new THREE.PlaneGeometry(.22,.3),
+      new THREE.MeshStandardMaterial({color:0xe8e4da,roughness:.9,side:THREE.DoubleSide}));
+     pp.rotation.x=-Math.PI/2; pp.rotation.z=rand(0,6.3); pp.position.set(rand(-2.5,2.5),6.47,rand(-33,-20)); g.add(pp); }
+    const ext=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.5,10),mat(0xb03028,.5,.4));
+    ext.position.set(1.75,6.85,-19.2); g.add(ext);
+    // a 1944 steward still setting the mess table
+    const stew=new THREE.Group();
+    const sm1=new THREE.MeshBasicMaterial({color:0xffe8c8,transparent:true,opacity:.22,depthWrite:false});
+    const scoat=new THREE.Mesh(new THREE.CylinderGeometry(.26,.38,1.5,8),sm1); scoat.position.y=.75; stew.add(scoat);
+    const shd=new THREE.Mesh(new THREE.SphereGeometry(.19,8,6),sm1); shd.position.y=1.68; stew.add(shd);
+    stew.position.set(2.2,6.45,-27.6); stew.rotation.y=-.9; g.add(stew);
+    (chapterData._corGhosts=chapterData._corGhosts||[]).push(stew);
+    // LUCKY CAT cameo: a maneki-neko figurine waving from the mess shelf (1944 crew's charm)
+    g.add(box(1.0,.08,1.4,0x6a5a42,4.15,8.3,-26,mat(0x6a5a42,.8)));
+    { const lc=new THREE.Group();
+     const lcW=mat(0xf4ece0,.7,.05), lcG=new THREE.MeshStandardMaterial({color:0xffd94d,emissive:0xcc9900,emissiveIntensity:.6});
+     const bd=new THREE.Mesh(new THREE.SphereGeometry(.10,10,8),lcW); bd.scale.set(1,1.15,1); bd.position.y=.12; lc.add(bd);
+     const hd2=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),lcW); hd2.position.y=.28; lc.add(hd2);
+     for(const sx of [-1,1]){ const ear=new THREE.Mesh(new THREE.ConeGeometry(.028,.06,4),lcW);
+      ear.position.set(sx*.045,.36,0); lc.add(ear); }
+     const bib=box(.11,.04,.02,0xc03028,0,.20,.085,mat(0xc03028,.7)); lc.add(bib);
+     const coin=new THREE.Mesh(new THREE.BoxGeometry(.05,.06,.012),lcG); coin.position.set(0,.13,.10); lc.add(coin);
+     const cushion=box(.22,.04,.22,0xc8a038,0,.02,0,mat(0xc8a038,.7)); lc.add(cushion);
+     const arm=new THREE.Group();
+     const paw=new THREE.Mesh(new THREE.CylinderGeometry(.024,.024,.11,8),lcW); paw.position.y=.055; arm.add(paw);
+     arm.position.set(-.085,.24,0); arm.rotation.z=.5; lc.add(arm);
+     lc.position.set(4.15,8.34,-26); lc.rotation.y=-Math.PI/2; g.add(lc);
+     chapterData.lucky={mesh:lc,arm};
+     interactables.push({pos:V3(4.15,8.6,-26),fn:()=>{ showMsg('A maneki-neko waves from the shelf. The crew kept it for luck.');
+      AU.tone(1568,1560,.6,'sine',.14); AU.tone(1568*2.76,1568*2.7,.3,'sine',.05); }}); } }
+   // GLaDOS-signed blueprint easter egg on the superstructure
+   const bcnv=document.createElement('canvas'); bcnv.width=256; bcnv.height=320;
+   const bx=bcnv.getContext('2d'); bx.fillStyle='#1a3a5c'; bx.fillRect(0,0,256,320);
+   bx.strokeStyle='#88bbdd'; bx.lineWidth=2;
+   bx.strokeRect(20,20,216,180); bx.beginPath(); bx.moveTo(20,110); bx.lineTo(236,110); bx.stroke();
+   bx.beginPath(); bx.arc(128,65,35,0,6.3); bx.stroke();
+   bx.beginPath(); bx.moveTo(60,130); bx.lineTo(196,180); bx.moveTo(196,130); bx.lineTo(60,180); bx.stroke();
+   bx.font='20px Courier New'; bx.fillStyle='#aaccff'; bx.fillText('BOOTSTRAP DEVICE',30,235);
+   bx.fillText('FIELD TELEPORT - UNTESTED',30,262);
+   bx.font='italic 24px Courier New'; bx.fillText('signed, GLaDOS',52,296);
+   const bTex=new THREE.CanvasTexture(bcnv);
+   const blueprint=new THREE.Mesh(new THREE.PlaneGeometry(1.3,1.6),
+    new THREE.MeshStandardMaterial({map:bTex,emissive:0x224466,emissiveIntensity:.7,emissiveMap:bTex}));
+   blueprint.position.set(-4.9,8.2,-40); blueprint.rotation.y=Math.PI/2; g.add(blueprint);
+   chapterData.blueprint=blueprint;
+   // time-slip shimmer
+   chapterData.slips=[];
+   for(let i=0;i<8;i++){ const s2=new THREE.Mesh(new THREE.PlaneGeometry(3.5,2),
+    new THREE.MeshBasicMaterial({color:0x66aaff,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));
+    s2.position.set(rand(-3,3),8.6,-22-i*6); g.add(s2); chapterData.slips.push(s2); }
+   // THE PHASE CORRIDOR: superstructure channel split between 1944 and now (mood plate 11)
+   // west wall: iced rust / present day - east wall: warm 1944 wood paneling
+   for(let qz=-35;qz>=-47;qz-=3){
+    const rustP=new THREE.Mesh(new THREE.PlaneGeometry(2.8,2.6),
+     mat(0x5a3a28,.9,.3)); rustP.rotation.y=Math.PI/2; rustP.position.set(-1.95,8,qz); g.add(rustP);
+    const frost=new THREE.Mesh(new THREE.PlaneGeometry(2.2,2),
+     new THREE.MeshBasicMaterial({color:0xbfd8e8,transparent:true,opacity:.25,depthWrite:false}));
+    frost.rotation.y=Math.PI/2; frost.position.set(-1.9,8.2,qz+.4); g.add(frost);
+    const woodP=new THREE.Mesh(new THREE.PlaneGeometry(2.8,2.6),
+     mat(0x6a4526,.75,.15)); woodP.rotation.y=-Math.PI/2; woodP.position.set(1.95,8,qz); g.add(woodP);
+    const trim=new THREE.Mesh(new THREE.PlaneGeometry(2.8,.3),
+     mat(0x8a6a3a,.7,.2)); trim.rotation.y=-Math.PI/2; trim.position.set(1.94,9.2,qz); g.add(trim); }
+   // corridor icicles (west) + sconce lamps (east, 1944 side)
+   for(const qz of [-36.5,-41,-45.5]){
+    for(let qi=0;qi<4;qi++){ const ic=new THREE.Mesh(new THREE.ConeGeometry(.07,rand(.4,.9),5),
+      mat(0xcfe0ee,.3,.1)); ic.rotation.x=Math.PI; ic.position.set(rand(-1.8,-.6),9.7,qz+rand(-1,1)); g.add(ic); }
+    const sconce=new THREE.Mesh(new THREE.SphereGeometry(.14,8,6),
+     new THREE.MeshStandardMaterial({color:0xffd890,emissive:0xffa030,emissiveIntensity:2.5}));
+    sconce.position.set(1.7,8.8,qz); g.add(sconce);
+    const sl=new THREE.PointLight(0xffa040,5,9,1.6); sl.position.set(1.5,8.8,qz); g.add(sl); }
+   // red carpet with brass compass rose (mood plate) down the 1944 half
+   const carpet=new THREE.Mesh(new THREE.PlaneGeometry(1.6,12),mat(0x6a1a1a,.9,.05));
+   carpet.rotation.x=-Math.PI/2; carpet.position.set(.8,6.62,-41); g.add(carpet);
+   const rose=new THREE.Mesh(new THREE.CircleGeometry(.5,16),
+    new THREE.MeshStandardMaterial({color:0xc8a038,emissive:0x664400,emissiveIntensity:.4}));
+   rose.rotation.x=-Math.PI/2; rose.position.set(.8,6.64,-41); g.add(rose);
+   // phase curtains across the corridor - walking through them slips time
+   for(const qz of [-38.5,-41.5,-44.5]){
+    const curtain=new THREE.Mesh(new THREE.PlaneGeometry(4,3.4),
+     new THREE.MeshBasicMaterial({color:0xd8ecff,transparent:true,opacity:.12,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
+    curtain.position.set(0,8.1,qz); g.add(curtain); chapterData.slips.push(curtain); }
+   // spectral crew inside the corridor's 1944 half
+   const corGhostM=new THREE.MeshBasicMaterial({color:0xffe8c8,transparent:true,opacity:.22,depthWrite:false});
+   for(const [qx,qz] of [[1.1,-39.5],[1.3,-43.5]]){
+    const gh=new THREE.Group();
+    const coat=new THREE.Mesh(new THREE.CylinderGeometry(.26,.38,1.5,8),corGhostM); coat.position.y=.75; gh.add(coat);
+    const hd=new THREE.Mesh(new THREE.SphereGeometry(.19,8,6),corGhostM); hd.position.y=1.68; gh.add(hd);
+    gh.position.set(qx,6.6,qz); gh.rotation.y=Math.PI/2; g.add(gh); (chapterData._corGhosts=chapterData._corGhosts||[]).push(gh); }
+   // low-gravity time-slip bubbles on deck (HLX gravity zones)
+   chapterData.gravZones=[];
+   for(const gz of [[-2.5,-50],[1.5,-44],[-1,-58]]){
+    const bubble=new THREE.Mesh(new THREE.SphereGeometry(3,14,10),
+     new THREE.MeshBasicMaterial({color:0x66ddff,transparent:true,opacity:.08,depthWrite:false}));
+    bubble.position.set(gz[0],8,gz[1]); g.add(bubble);
+    chapterData.gravZones.push({x:gz[0],y:8,z:gz[1],r:3,mesh:bubble}); }
+   // PHASE SEAM: the ship flickers between 1944 and now
+   chapterData.seam={planes:[],ghosts:[...(chapterData._corGhosts||[])],light:null};
+   for(const sz of [-36,-54,-38.5,-41.5,-44.5]){
+    const seam=new THREE.Mesh(new THREE.PlaneGeometry(11,6),
+     new THREE.MeshBasicMaterial({color:0xcfe8ff,transparent:true,opacity:.10,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
+    seam.position.set(0,10,sz); g.add(seam); chapterData.seam.planes.push(seam); }
+   // spectral 1940s crew behind the far seam: warm lamplight, white coats
+   const spectral=new THREE.Group();
+   const ghostM=new THREE.MeshBasicMaterial({color:0xffe8c8,transparent:true,opacity:.28,depthWrite:false});
+   for(const [gx,gz,gr] of [[-1.5,-58,.3],[0,-59,-.2],[1.2,-58.5,.5],[2,-60,-.4]]){
+    const gh=new THREE.Group();
+    const coat=new THREE.Mesh(new THREE.CylinderGeometry(.28,.4,1.5,8),ghostM); coat.position.y=.75; gh.add(coat);
+    const hd=new THREE.Mesh(new THREE.SphereGeometry(.2,8,6),ghostM); hd.position.y=1.7; gh.add(hd);
+    gh.rotation.y=gr; gh.position.set(gx,0,gz); spectral.add(gh); chapterData.seam.ghosts.push(gh); }
+   const lamp=new THREE.Mesh(new THREE.SphereGeometry(.3,8,6),
+    new THREE.MeshBasicMaterial({color:0xffd890,transparent:true,opacity:.5}));
+   lamp.position.set(0,3.2,-59); spectral.add(lamp);
+   const seamLight=new THREE.PointLight(0xffc070,10,14,1.5); seamLight.position.set(0,9.5,-58); g.add(seamLight);
+   chapterData.seam.light=seamLight;
+   spectral.position.y=6.9; g.add(spectral); chapterData.seam.spectral=spectral;
+   // gravity gun on a pedestal mid-deck
+   makePickup(0,7.0,-45,'weapon'); chapterData.gravPickup=true;
+   // props
+   for(let i=0;i<8;i++){ let px2=rand(-3,3); if(i<3&&Math.abs(px2)<1.9)px2=(px2<0?-1:1)*rand(1.9,2.9); makeProp(px2,7,-30-i*4,.6,i%3?'crate':'barrel'); }
+   // THE BOOTSTRAP DEVICE at the bow end of the deck
+   const bsd=new THREE.Group();
+   bsd.add(box(2,.6,2,0x4a5560,0,.3,0,mat(0x4a5560,.5,.6)));
+   const core=new THREE.Mesh(new THREE.SphereGeometry(.55,14,12),
+    new THREE.MeshStandardMaterial({color:0x99eeff,emissive:0x33ccff,emissiveIntensity:2.5}));
+   core.position.y=1.4; bsd.add(core);
+   const rings=[];
+   for(let q=0;q<3;q++){ const ring=new THREE.Mesh(new THREE.TorusGeometry(.95,.05,8,24),
+    new THREE.MeshStandardMaterial({color:0x66ccff,emissive:0x2288ff,emissiveIntensity:1.5}));
+    ring.position.y=1.4; bsd.add(ring); rings.push(ring); }
+   bsd.position.set(0,6.4,-68); g.add(bsd);
+   chapterData.bootstrap={mesh:bsd,core,rings,armed:false};
+   interactables.push({pos:V3(0,7.5,-68),fn:armBootstrap}); chapterData.waypoint=V3(0,7.5,-68);
+   // enemies: deck crew of the damned + combine compound guards + manhacks
+   spawnZombie(0,-25); spawnZombie(1,-33); spawnHeadcrab(-2,-29);
+   spawnZombie(-1,-52); spawnHeadcrab(2,-58); spawnZombie(0,-62);
+   spawnManhack(2,8,-22); spawnManhack(-2,8,-50);
+   spawnSoldier(-9,-32); spawnSoldier(9,-56);
+   makePickup(-3,6.9,-28,'health',25); makePickup(3,6.9,-40,'ammo_pulse',60);
+   makePickup(0,6.9,-56,'suit',25); makePickup(-2,6.9,-64,'ammo_smg',60);
+   makePickup(2,6.9,-66,'cache');
+   makeMotes(200,0xbfd8ee,.08,15,{x:.8,y:-.5}); // ice crystals
+   // stars + moon over the ice
+   const stG=new THREE.BufferGeometry(); const sp=[];
+   for(let i=0;i<600;i++)sp.push(rand(-250,250),rand(10,160),rand(-350,30));
+   stG.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
+   g.add(new THREE.Points(stG,new THREE.PointsMaterial({color:0xaabbdd,size:.6})));
+   const moon=new THREE.Mesh(new THREE.CircleGeometry(9,24),new THREE.MeshBasicMaterial({color:0xdde6f2}));
+   moon.position.set(-60,70,-200); moon.lookAt(0,5,0); g.add(moon);
+   const moonGlow=new THREE.Mesh(new THREE.CircleGeometry(16,24),new THREE.MeshBasicMaterial({color:0x8899bb,transparent:true,opacity:.25}));
+   moonGlow.position.set(-60,70,-201); moonGlow.lookAt(0,5,0); g.add(moonGlow);
+   // hull as flanking blocks: gangway ramp + deck corridor (|x|<5) stays open
+   addCollider(-6,0,-45,2,9,60); addCollider(6,0,-45,2,9,60);
+   addCollider(0,0,-77,14,9,6); // bow cap past the foredeck
+   // foredeck interior: the bootstrap chamber (bulkheads, door frame, emergency light)
+   { const bulkM=mat(0x9aa6b2,.6,.4), darkM=mat(0x7a848e,.65,.35);
+    for(const sx of [-1,1]){ g.add(box(.3,3.4,12,0x9aa6b2,sx*4.8,7.9,-66,bulkM)); addCollider(sx*4.8,6,-66,.7,3.6,12); }
+    g.add(box(10,1,12.3,0x8a949e,0,10,-66,darkM)); // ceiling
+    for(const sx of [-1,1]){ g.add(box(.5,3.4,.5,0x7a848e,sx*2.2,7.9,-60.5,darkM)); addCollider(sx*2.2,6,-60.5,.9,3.6,.6); }
+    g.add(box(5.4,.7,.5,0x7a848e,0,9.9,-60.5,darkM)); // door header
+    for(const lz of [-62.5,-70]){ const el3=new THREE.PointLight(0xff5040,10,11); el3.position.set(0,9.4,lz); g.add(el3); }
+    const wl=new THREE.PointLight(0xffc880,14,12); wl.position.set(0,8.6,-67); g.add(wl); }
+   // bow rail: deck ends here - no unrecoverable 6.4m drop
+   for(const rx of [-4.6,-1.6,1.6,4.6]){ const post=box(.12,1.1,.12,0x8a949e,rx,6.9,-72.1,mat(0x8a949e,.5,.5)); g.add(post); }
+   const rbar=box(9.6,.1,.14,0x9aa6b2,0,7.42,-72.1,mat(0x9aa6b2,.5,.5)); g.add(rbar);
+   const rbar2=box(9.6,.08,.12,0x9aa6b2,0,7.0,-72.1,mat(0x9aa6b2,.5,.5)); g.add(rbar2);
+   addCollider(0,6.4,-72.3,10,1.7,.5);
+   addCollider(-3.5,6,-41,3,3.4,14); addCollider(3.5,6,-41,3,3.4,14);
+   addCollider(-2.2,6,-31,5.5,2.6,6); // hangar shifted port - starboard walkway open
+   groundY=(x,z)=>{ if(Math.abs(x)<5){ if(z<=-18&&z>=-72)return 6.4; if(z<-8&&z>-18)return 6.4*(-z-8)/10; } return 0; };
+  },
+  onUpdate(dt){
+   const d=chapterData, now=performance.now()*.001;
+   for(const s2 of d.slips)s2.material.opacity=.07+Math.sin(now*1.5+s2.position.z)*.05;
+   if(d.bootstrap){ d.bootstrap.rings.forEach((r,i)=>{ r.rotation.x=now*(1+i*.5); r.rotation.y=now*(.7+i*.3); });
+    d.bootstrap.core.material.emissiveIntensity=d.bootstrap.armed?4+Math.sin(now*8)*2:2+Math.sin(now*2)*.5; }
+   if(d.flicker){ d.flicker.intensity=Math.random()<.05?1+Math.random()*2:8+Math.sin(now*11)*1.2; }
+   if(d.lucky){ d.lucky.arm.rotation.z=.5+Math.sin(now*5)*.45; }
+   if(d.advisors)for(const a of d.advisors)a.position.y=a.userData.baseY+Math.sin(now*.8+a.position.x)*.5;
+   if(d.seam){ const ph=(Math.sin(now*.7)+1)/2; // slow phase cycle
+    d.seam.planes.forEach((p,i)=>{ p.material.opacity=.06+.14*Math.abs(Math.sin(now*.7+i)); });
+    d.seam.spectral.visible=ph>.35;
+    d.seam.ghosts.forEach((gh,i)=>{ gh.children.forEach(m=>m.material.opacity=.1+.22*Math.abs(Math.sin(now*.9+i*1.3))); });
+    d.seam.light.intensity=d.seam.spectral.visible?8+Math.sin(now*3)*3:0; }
+   if(d.gravZones){ let inZ=false;
+    for(const z of d.gravZones){ z.mesh.material.opacity=.06+Math.sin(now*2+z.z)*.03;
+     if(player.pos.distanceTo(V3(z.x,z.y,z.z))<z.r)inZ=true; }
+    player.gravScale=inZ?.28:1; }
+   // walk-through time slip: crossing a phase seam throws the ship into 1944
+   if(d.lastZ===undefined)d.lastZ=player.pos.z;
+   for(const sz of [-36,-54]){
+    if((d.lastZ-sz)*(player.pos.z-sz)<0&&Math.abs(player.pos.x)<5.5){
+     d.phaseUntil=now+6; AU.stinger(); AU.tone(180,600,1.8,'sine',.25);
+     showMsg('TIME SLIP - 1944 bleeds through. The crew does not see you.');
+     const fl2=document.createElement('div');
+     fl2.style.cssText='position:fixed;inset:0;background:#cfe4ff;opacity:0;transition:opacity .35s;z-index:7;pointer-events:none';
+     document.body.appendChild(fl2);
+     requestAnimationFrame(()=>fl2.style.opacity=.5);
+     setTimeout(()=>{ fl2.style.opacity=0; setTimeout(()=>fl2.remove(),400); },700); } }
+   d.lastZ=player.pos.z;
+   if(d.phaseUntil&&now<d.phaseUntil){ player.gravScale=Math.min(player.gravScale,.45);
+    d.seam.spectral.visible=true; d.seam.light.intensity=12+Math.sin(now*5)*4;
+    d.seam.planes.forEach(p=>p.material.opacity=.3); }
+   if(d.blueprint&&!d.bpSeen&&player.pos.distanceTo(d.blueprint.position)<3){ d.bpSeen=true;
+    showMsg('BLUEPRINTS: BOOTSTRAP DEVICE - signed, GLaDOS'); AU.pickup(); }
+  } },
+ // ---------------- CH 4: COMBINE NEXUS
+ { name:'CHAPTER 4', title:'COMBINE NEXUS',
+  objective:'Fight to the nexus spire. Kill the Strider guard.',
+  fog:[0x14302e,.012], sky:0x0d2226, ambient:[0x4a7a78,1.7], sun:[0xbfe8dd,1.5,[-20,60,-10]], scale:[116.5,138.6,155.6,185,233],
+  build(){
+   const g=levelGroup;
+   const gd=new THREE.Mesh(new THREE.PlaneGeometry(400,400,48,48),mat(0x1d2a28,.9,.1));
+   gd.rotation.x=-Math.PI/2; gd.receiveShadow=true; g.add(gd);
+   const pos=gd.geometry.attributes.position;
+   for(let i=0;i<pos.count;i++){ const x=pos.getX(i),y=pos.getY(i);
+    pos.setZ(i,Math.sin(x*.04)*Math.cos(y*.05)*2.6+Math.sin(x*.1+y*.13)*.8); }
+   gd.geometry.computeVertexNormals();
+   groundY=(x,z)=>Math.sin(x*.04)*Math.cos(-z*.05)*2.6+Math.sin(x*.1-z*.13)*.8;
+   // alien spires
+   const spireG=new THREE.ConeGeometry(2,18,5);
+   const spires=new THREE.InstancedMesh(spireG,mat(0x141d1c,.6,.3),40);
+   const m4=new THREE.Matrix4();
+   for(let i=0;i<40;i++){ const a=Math.random()*6.28,r=14+Math.random()*150;
+    const x=Math.cos(a)*r,z=Math.sin(a)*r,s=rand(.6,2.4);
+    m4.makeScale(s,s,s); m4.setPosition(x,groundY(x,z)+8*s,z); spires.setMatrixAt(i,m4); }
+   g.add(spires);
+   // DYSON SPHERE in the sky
+   const ds=new THREE.Group();
+   for(const [rr,rx,rz] of [[150,.3,0],[170,-.15,.4],[190,.1,-.25]]){
+    const ringSeg=new THREE.Mesh(new THREE.TorusGeometry(rr,2.5,6,64,4.6),
+     new THREE.MeshBasicMaterial({color:0x1d4a44,wireframe:true,transparent:true,opacity:.4}));
+    ringSeg.rotation.x=Math.PI/2+rx; ringSeg.rotation.z=rz; ds.add(ringSeg); }
+   const star=new THREE.Mesh(new THREE.SphereGeometry(26,16,12),
+    new THREE.MeshBasicMaterial({color:0xe8fff8}));
+   ds.add(star);
+   const starGlow=new THREE.Mesh(new THREE.SphereGeometry(52,16,12),
+    new THREE.MeshBasicMaterial({color:0xcc5522,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false}));
+   ds.add(starGlow);
+   ds.position.set(0,120,-300); g.add(ds); chapterData.dyson=ds;
+   // floating islands (mood plate: drifting black platforms)
+   for(const [ix,iy,iz,is2] of [[-60,40,-140,1],[70,55,-180,1.4],[-30,70,-220,.8],[40,35,-120,.7],[0,85,-260,1.8]]){
+    const isl=new THREE.Group();
+    isl.add(box(14*is2,2.5*is2,10*is2,0x101818,0,0,0,mat(0x101818,.7,.3)));
+    isl.add(box(6*is2,7*is2,5*is2,0x141d1c,0,-4*is2,0,mat(0x141d1c,.7,.3)));
+    isl.position.set(ix,iy,iz); g.add(isl); }
+   // green energy pylons
+   for(let i=0;i<6;i++){ const p=new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,10,6),
+    new THREE.MeshStandardMaterial({color:0x113322,emissive:0x22ff88,emissiveIntensity:.8}));
+    const x=rand(-20,20),z=-20-i*14; if(Math.hypot(x-16,z+76)<9){p.geometry.dispose();continue;}
+    p.position.set(x,groundY(x,z)+5,z); g.add(p); }
+   // pulse rifle at chapter start
+   makePickup(0,groundY(0,-6)+.6,-6,'weapon'); chapterData.pulsePickup=true;
+   makePickup(1,groundY(1,-7)+.5,-7,'ammo_pulse',90);
+   // heavy resistance
+   spawnSoldier(-6,-20); spawnSoldier(6,-22); spawnHunter(0,-28);
+   spawnSoldier(-8,-38); spawnSoldier(8,-40); spawnHunter(-4,-48); spawnHunter(5,-54);
+   spawnSoldier(0,-62); spawnSoldier(-6,-70); spawnSoldier(7,-72);
+   spawnGorilla(-4,-34); spawnGorilla(6,-66);
+   spawnSwooper(-3,6,-26); spawnSwooper(4,7,-52);
+   spawnStrider(0,-92);
+   makePickup(-3,groundY(-3,-44)+.5,-44,'health',25);
+   makePickup(3,groundY(3,-58)+.5,-58,'suit',25);
+   makePickup(0,groundY(0,-80)+.5,-80,'cache');
+   makePickup(2,groundY(2,-84)+.5,-84,'ammo_pulse',90);
+   // island-hop beat: a low drifting island off the main path - cache guarded by a swooper nest
+   { const hx=16,hz=-80,hb=groundY(hx,hz);
+    const hop=new THREE.Group();
+    hop.add(box(10,2,8,0x2a3d38,0,0,0,new THREE.MeshStandardMaterial({color:0x2a3d38,roughness:.7,metalness:.2,emissive:0x16332b,emissiveIntensity:.8})));
+    const trim=new THREE.Mesh(new THREE.BoxGeometry(10.2,.22,8.2),
+     new THREE.MeshStandardMaterial({color:0x113322,emissive:0x2affaa,emissiveIntensity:1.2}));
+    trim.position.y=1.05; hop.add(trim);
+    hop.add(box(4.5,6,4,0x141d1c,0,-4,0,mat(0x141d1c,.7,.3)));
+    const hglow=new THREE.Mesh(new THREE.BoxGeometry(6,.3,4),
+     new THREE.MeshStandardMaterial({color:0x113322,emissive:0x22ff88,emissiveIntensity:.7}));
+    hglow.position.y=-1.1; hop.add(hglow);
+    const hlite=new THREE.PointLight(0x88ffd8,60,24); hlite.position.set(0,5,4); hop.add(hlite);
+    hop.position.set(hx,hb+2,hz); g.add(hop); chapterData.hopIsle=hop;
+    platforms.push({x:hx,z:hz,hw:5,hd:4,top:hb+3});
+    for(const [sx,sz,st] of [[9.5,-76.5,1],[13,-78.5,2]]){
+     const rk=new THREE.Mesh(new THREE.DodecahedronGeometry(1.5,0),mat(0x2a3432,.8,.2));
+     rk.position.set(sx,hb+st-.8,sz); rk.scale.y=1.4; g.add(rk);
+     platforms.push({x:sx,z:sz,hw:1.5,hd:1.5,top:hb+st+.3}); }
+    makePickup(hx,hb+3.6,hz,'cache');
+    makePickup(hx-1.5,hb+3.6,hz+1,'health',25);
+    spawnSwooper(hx,hb+7,hz); spawnSwooper(hx-3,hb+8,hz-3); }
+   makeMotes(350,0x66ffcc,.1,30,{x:.3,y:1.2}); // rising spores
+   chapterData.exitZ=-100; chapterData.bossDead=false; chapterData.waypoint=V3(0,3,-100);
+  },
+  onUpdate(dt){
+   const d4=chapterData; d4.dyson.rotation.y+=dt*.02;
+   // distant orbital war: rumbles + sky flashes + a circling gunship silhouette
+   d4.warT=(d4.warT||8)-dt;
+   if(d4.warT<=0){ d4.warT=rand(9,20); AU.noise(.9,.09,110,'lowpass');
+    if(Math.random()<.4){ d4.flashT=.3; } }
+   if(d4.flashT>0){ d4.flashT-=dt; if(d4.sun)d4.sun.intensity=1.5+d4.flashT*8; }
+   else if(d4.sun&&d4.sun.intensity>1.6)d4.sun.intensity=1.5;
+   if(!d4.gunship){ const gs=new THREE.Group();
+    gs.add(box(3,1,5.5,0x141c22,0,0,0,mat(0x141c22,.5,.6)));
+    gs.add(box(5.5,.3,2,0x1c2630,0,.3,0,mat(0x1c2630,.5,.6)));
+    const gl=new THREE.PointLight(0x66ffcc,4,14); gl.position.y=-.8; gs.add(gl);
+    gs.position.set(0,34,-120); levelGroup.add(gs); d4.gunship=gs; }
+   d4.gsA=(d4.gsA||0)+dt*.14;
+   d4.gunship.position.set(Math.cos(d4.gsA)*70,32+Math.sin(d4.gsA*2.3)*4,-120+Math.sin(d4.gsA)*50);
+   d4.gunship.rotation.y=-d4.gsA;
+   const strider=enemies.find(e=>e.kind==='strider');
+   if(!chapterData.bossDead&&!strider){ chapterData.bossDead=true;
+    showMsg('STRIDER DOWN - the way to the spire is open.'); AU.stinger(); setObjective('Enter the nexus spire.'); }
+   if(!chapterData.bossDead){
+    if(player.pos.z<chapterData.exitZ+1.5)player.pos.z=chapterData.exitZ+1.5; // shield fence
+    if(player.pos.z<chapterData.exitZ+9&&!d4.gateMsg){ d4.gateMsg=true;
+     showMsg('THE SPIRE IS SHIELDED - KILL THE STRIDER'); AU.stinger(); } }
+   if(player.pos.z<chapterData.exitZ&&chapterData.bossDead)completeChapter();
+  } },
+ // ---------------- CH 5: THE G-MAN (finale)
+ { name:'CHAPTER 5', title:'PLACES TO DO, THINGS TO BE',
+  objective:'Take her back.',
+  fog:[0x0d0d1a,.016], sky:0x0a0a16, ambient:[0x8a96c0,1.6], sun:[0xaabbdd,1.5,[0,40,20]], scale:[65.4,73.4,87.3,98],
+  build(){
+   const g=levelGroup;
+   // limbo: floating walkway in the void
+   const walk=new THREE.Mesh(new THREE.BoxGeometry(4,.4,120),mat(0x2a3440,.6,.2));
+   walk.position.set(0,0,-60); g.add(walk);
+   // glowing edge strips + light pillars
+   const stripM=new THREE.MeshStandardMaterial({color:0x88bbff,emissive:0x4488ff,emissiveIntensity:1.6});
+   for(const sx of [-1,1]){ const strip=new THREE.Mesh(new THREE.BoxGeometry(.12,.06,120),stripM);
+    strip.position.set(sx*1.9,.42,-60); g.add(strip); }
+   for(let i=0;i<8;i++){ const pil=new THREE.Mesh(new THREE.BoxGeometry(.2,2.4,.2),stripM.clone());
+    pil.material.emissiveIntensity=.8; const sx=i%2?2.2:-2.2;
+    pil.position.set(sx,1.2,-14-i*13); g.add(pil); }
+   groundY=(x,z)=>(Math.abs(x)<2&&z<0&&z>-120)?0.2:-100;
+   // floating fragments of the world (mood plate: Black Mesa / City 17 / arctic debris)
+   const fragM=mat(0x2c3140,.8,.15);
+   const frags=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),fragM,40);
+   const fm4=new THREE.Matrix4();
+   for(let i=0;i<40;i++){ const a=Math.random()*6.28, r=8+Math.random()*50;
+    const fx=Math.cos(a)*r, fy=rand(-15,30), fz=rand(-140,20);
+    fm4.makeRotationY(Math.random()*3); fm4.scale(new THREE.Vector3(rand(1,6),rand(.5,3),rand(1,5)));
+    fm4.setPosition(fx,fy,fz); frags.setMatrixAt(i,fm4); }
+   g.add(frags); chapterData.frags=frags;
+   // a ruined building fragment + a bridge arch silhouette
+   const ruin=new THREE.Group();
+   ruin.add(box(6,10,5,0x30364a,0,5,0,mat(0x30364a,.85,.1)));
+   ruin.add(box(5,3,4,0x2a3040,1,-2,0,mat(0x2a3040,.85,.1)));
+   ruin.position.set(-14,-2,-70); ruin.rotation.z=.18; g.add(ruin);
+   const bridge=new THREE.Group();
+   bridge.add(box(16,1,2,0x384050,0,6,0,mat(0x384050,.85,.1)));
+   bridge.add(box(1.5,6,2,0x384050,-6,3,0,mat(0x384050,.85,.1)));
+   bridge.add(box(1.5,6,2,0x384050,6,3,0,mat(0x384050,.85,.1)));
+   bridge.position.set(15,-4,-45); bridge.rotation.z=-.22; g.add(bridge);
+   // THE DOOR OF LIGHT above the end of the walkway
+   const door=new THREE.Group();
+   const doorGlow=new THREE.Mesh(new THREE.PlaneGeometry(3,7),
+    new THREE.MeshBasicMaterial({color:0xf4f6ff,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+   door.add(doorGlow);
+   const doorFrame=box(4,.4,8.4,0x8899bb,0,0,0,mat(0x8899bb,.5,.5)); door.add(doorFrame);
+   const doorLight=new THREE.PointLight(0xdde8ff,30,60,1.4); doorLight.position.set(0,-4,2); door.add(doorLight);
+   door.position.set(0,16,-118); door.rotation.x=.12; g.add(door);
+   chapterData.door={mesh:door,glow:doorGlow,light:doorLight};
+   // void stars
+   const starG=new THREE.BufferGeometry(); const sp=[];
+   for(let i=0;i<800;i++)sp.push(rand(-200,200),rand(-40,120),rand(-300,50));
+   starG.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
+   g.add(new THREE.Points(starG,new THREE.PointsMaterial({color:0x8899bb,size:.5})));
+   // the G-Man at the end
+   const gm=new THREE.Group();
+   gm.add(box(.5,.7,.3,0x3a4a3a,0,.95,0,mat(0x3a4a3a,.8))); // suit
+   const gmhead=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),mat(0xc8b090,.8)); gmhead.position.set(0,1.45,0); gm.add(gmhead);
+   gm.add(box(.2,.1,.22,0x2a2018,0,1.58,0,mat(0x2a2018,.8))); // hair
+   const caseB=box(.34,.26,.12,0x5a4a2a,.35,.6,0,mat(0x5a4a2a,.8)); gm.add(caseB); // briefcase
+   gm.position.set(0,.2,-112); g.add(gm); chapterData.gman=gm;
+   // Alyx stasis pod
+   const pod=new THREE.Group();
+   pod.add(box(1,2.2,1,0x223344,0,1.1,0,mat(0x223344,.4,.6)));
+   const podGlass=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,1.8,10),
+    new THREE.MeshStandardMaterial({color:0x88ddff,transparent:true,opacity:.3,emissive:0x226688,emissiveIntensity:.6}));
+   podGlass.position.y=1.1; pod.add(podGlass);
+   pod.position.set(1.6,.2,-112); g.add(pod); chapterData.alyxPod={pod,glass:podGlass,freed:false};
+   // advisors guard the walkway
+   spawnSoldier(0,-30); spawnSoldier(0,-50); spawnSoldier(-1,-70);
+   spawnAdvisor(0,3.5,-95);
+   makePickup(0,.7,-40,'health',25); makePickup(0,.7,-60,'suit',50);
+   makePickup(0,.7,-80,'cache');
+   makeMotes(300,0xfff2cc,.12,20,{x:.15,y:.4}); // limbo drift
+   chapterData.exitZ=-110.5; chapterData.waypoint=V3(1.6,1.3,-112);
+   interactables.push({pos:V3(1.6,1.3,-112),fn:()=>{
+    const d=chapterData; if(!d.alyxPod||d.alyxPod.freed)return; d.alyxPod.freed=true;
+    d.alyxPod.glass.material.opacity=0; AU.pickup(); AU.tone(392,523,.8,'sine',.2);
+    showMsg('ALYX: "Gordon. You came for me." - the pod releases her.');
+    setObjective('Walk into the light. Together.'); }});
+  },
+  onUpdate(dt){
+   const d=chapterData, gm=d.gman, now=performance.now()*.001;
+   if(gm){ gm.rotation.y=Math.atan2(player.pos.x-gm.position.x,player.pos.z-gm.position.z); }
+   if(d.stage===undefined)d.stage=0;
+   const z=player.pos.z;
+   if(d.stage===0&&z<-18){ d.stage=1; showMsg('G-MAN: "Rise and shine, Doctor Freeman. Not that I wish to imply you have been sleeping."'); AU.tone(196,196,1.5,'sine',.18); }
+   else if(d.stage===1&&z<-42){ d.stage=2; showMsg('G-MAN: "Miss Vance has proven to be of... extraordinary value."'); }
+   else if(d.stage===2&&z<-70){ d.stage=3; showMsg('G-MAN: "A previous hire proved unable - or unwilling - to perform the tasks laid before him."'); }
+   else if(d.stage===3&&z<-98){ d.stage=4; showMsg('G-MAN: "We have places to do. And things to be."'); AU.stinger(); }
+   if(d.door){ d.door.glow.material.opacity=.8+Math.sin(now*1.7)*.15; d.door.light.intensity=26+Math.sin(now*1.7)*6; }
+   if(d.frags)d.frags.rotation.y+=dt*.005;
+   if(z<d.exitZ)completeChapter();
+  } },
+];
+let chapterData={}, currentChapter=0;
+
+function makeSnow(){
+ const n=1500, pos=new Float32Array(n*3);
+ for(let i=0;i<n;i++){ pos[i*3]=rand(-60,60); pos[i*3+1]=rand(0,40); pos[i*3+2]=rand(-80,20); }
+ const gGeo=new THREE.BufferGeometry(); gGeo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+ const snow=new THREE.Points(gGeo,new THREE.PointsMaterial({color:0xffffff,size:.15,transparent:true,opacity:.8}));
+ levelGroup.add(snow); chapterData.snow=snow;
+}
+function makeMotes(n,color,size,h,drift){
+ const pos=new Float32Array(n*3);
+ for(let i=0;i<n;i++){ pos[i*3]=rand(-50,50); pos[i*3+1]=rand(0,h||25); pos[i*3+2]=rand(-90,15); }
+ const g2=new THREE.BufferGeometry(); g2.setAttribute('position',new THREE.BufferAttribute(pos,3));
+ const m=new THREE.Points(g2,new THREE.PointsMaterial({color,size,transparent:true,opacity:.5,depthWrite:false}));
+ levelGroup.add(m); chapterData.motes={mesh:m,drift};
+}
+function updateMotes(dt){ const s=chapterData.motes; if(!s)return;
+ const p=s.mesh.geometry.attributes.position;
+ for(let i=0;i<p.count;i++){ let y=p.getY(i)+s.drift.y*dt;
+  let x=p.getX(i)+(Math.sin(y*.4+i)*.3+s.drift.x)*dt;
+  if(s.drift.y<0&&y<0)y=25; if(s.drift.y>0&&y>28)y=0; if(x>50)x=-50;
+  p.setY(i,y); p.setX(i,x); }
+ p.needsUpdate=true;
+}
+function updateSnow(dt){ const s=chapterData.snow; if(!s)return;
+ const p=s.geometry.attributes.position;
+ const gf2=chapterData.gustF||0;
+ for(let i=0;i<p.count;i++){ let y=p.getY(i)-dt*4*(1+gf2*1.5); if(y<0)y=40;
+  let px=p.getX(i)+Math.sin(y*.3+i)*dt*1.5+dt*gf2*9; if(px>60)px=-60;
+  p.setY(i,y); p.setX(i,px); }
+ p.needsUpdate=true;
+}
+
+// ============================================================= CHAPTER FLOW
+function clearLevel(){
+ if(levelGroup)scene.remove(levelGroup);
+ levelGroup=new THREE.Group(); scene.add(levelGroup);
+ colliders=[]; platforms=[]; thrown=[]; props=[]; pickups=[]; enemies=[]; projectiles=[]; interactables=[]; chapterData={};
+}
+function loadChapter(i){
+ currentChapter=i; clearLevel(); chapterKills=0; chapterT0=performance.now();
+ const ch=chapters[i];
+ scene.fog=new THREE.FogExp2(ch.fog[0],ch.fog[1]);
+ scene.background=new THREE.Color(ch.sky);
+ // lights
+ const amb=new THREE.AmbientLight(ch.ambient[0],ch.ambient[1]); levelGroup.add(amb);
+ const sun=new THREE.DirectionalLight(ch.sun[0],ch.sun[1]);
+ sun.position.set(...ch.sun[2]); sun.castShadow=true; levelGroup.add(sun.target);
+ sun.shadow.mapSize.set(2048,2048);
+ sun.shadow.camera.left=-60;sun.shadow.camera.right=60;sun.shadow.camera.top=60;sun.shadow.camera.bottom=-60;
+ levelGroup.add(sun); chapterData.sun=sun;
+ const hemi=new THREE.HemisphereLight(ch.sky,0x111111,.55); levelGroup.add(hemi);
+ ch.build();
+ // difficulty curve: later chapters hit harder and soak more
+ const hpMul=1+i*.12, dmgMul=1+i*.08;
+ for(const e of enemies){ e.hp*=hpMul; e.dmg*=dmgMul; }
+ // reset player to chapter start
+ const sp=ch.spawn||[0,6,0]; player.pos.set(sp[0],1.7,sp[1]); player.vel.set(0,0,0); player.yaw=sp[2]||0; player.pitch=0;
+ player.heldProp=null; player.gravScale=1;
+ // chapter transition card + banner
+ const cc=$('chcard'); cc.style.display='flex'; cc.style.opacity=1;
+ $('chcard-t').textContent=ch.name; $('chcard-h').textContent=ch.title;
+ setTimeout(()=>{ cc.style.opacity=0; setTimeout(()=>cc.style.display='none',650);
+  $('chapter').textContent=ch.name+' - '+ch.title;
+  $('chapter').style.opacity=1; setTimeout(()=>$('chapter').style.opacity=0,4200); },1300);
+ if(ch.scale)AU.music.scale=ch.scale;
+ setObjective(ch.objective);
+ updateHUD();
+}
+function armBootstrap(){
+ const d=chapterData;
+ if(!d.bootstrap||d.bootstrap.armed)return;
+ d.bootstrap.armed=true;
+ AU.stinger(); AU.tone(80,400,1.2,'sine',.4);
+ // white flash
+ const fl=document.createElement('div');
+ fl.style.cssText='position:fixed;inset:0;background:#dff4ff;opacity:0;transition:opacity .8s;z-index:9;pointer-events:none';
+ document.body.appendChild(fl);
+ requestAnimationFrame(()=>fl.style.opacity=.95);
+ showMsg('BOOTSTRAP DEVICE ONLINE - the ship shudders through space and time.');
+ setObjective('The Borealis is slipping. Hold on.');
+ setTimeout(()=>{ fl.style.opacity=0; setTimeout(()=>fl.remove(),900); completeChapter(); },2600);
+}
+function completeChapter(){
+ if(chapterData.completing)return; chapterData.completing=true;
+ if(currentChapter>=chapters.length-1){ gameEnd(); return; }
+ AU.stinger();
+ const el=(performance.now()-chapterT0)/1000, mm=Math.floor(el/60), ss=Math.floor(el%60);
+ showMsg('CHAPTER COMPLETE - '+mm+':'+String(ss).padStart(2,'0')+' - '+chapterKills+' KILLS');
+ setTimeout(()=>loadChapter(currentChapter+1),1800);
+}
+function gameEnd(){
+ locked=false; document.exitPointerLock&&document.exitPointerLock();
+ const e=$('end'); e.style.display='flex';
+ e.innerHTML='<h1 style="font-size:42px;letter-spacing:4px;text-shadow:0 0 24px #f906">THE RIGHT WOMAN IN THE WRONG PLACE</h1>'+
+ '<p style="color:#889;max-width:520px;text-align:center;line-height:1.7">The walkway dissolves. The G-Man straightens his tie, and for the first time in a long time, he looks almost... surprised.<br><br>"Miss Vance," he says, stepping aside, "has places to do. And things to be."<br><br>Alyx opens her eyes. Behind you, impossibly far and impossibly close, a Dyson sphere glitters.<br><br>You hand her the crowbar. Eli is waiting.</p>'+
+ '<p style="color:#f90;margin-top:18px">HALF-LIFE <span style="color:#fff">&lambda;</span> - A FAN-MADE CONTINUATION</p>'+
+ '<p style="color:#667;font-size:12px;margin-top:10px">refresh to play again - "prepare for unforeseen consequences"</p>';
+ AU.stinger();
+}
+
+// ============================================================= HUD
+function updateHUD(){
+ $('health').textContent=Math.max(0,Math.ceil(player.hp));
+ $('suit').textContent=Math.max(0,Math.ceil(player.suit));
+ const w=WDEF[player.weapon];
+ if(w.mag){ const a=player.ammo[w.mag]; $('mag').textContent=a+' / '+player.reserve[w.mag];
+  $('mag').classList.toggle('low',a>0&&a<=player.mags[w.mag]*.25); $('mag').classList.toggle('empty',a===0); }
+ else { $('mag').textContent='--'; $('mag').classList.remove('low','empty'); }
+ $('wpn').textContent=w.name;
+}
+function setObjective(t){ $('obj').textContent=t; $('obj').style.opacity=1; setTimeout(()=>$('obj').style.opacity=0,6000); }
+let msgTimer=null;
+function showMsg(t){ $('msg').textContent=t; $('msg').style.opacity=1;
+ clearTimeout(msgTimer); msgTimer=setTimeout(()=>$('msg').style.opacity=0,3800); }
+function flashHeal(){ $('heal').style.opacity=1; setTimeout(()=>$('heal').style.opacity=0,350); }
+let hitmT=null;
+function hitmark(crit){ const el=$('hitm'); el.style.opacity=1; el.style.color=crit?'#ff9a30':'#fff'; el.style.fontSize=crit?'30px':'22px';
+ clearTimeout(hitmT); hitmT=setTimeout(()=>el.style.opacity=0,crit?150:90); if(crit)AU.tone(1500,2200,.05,'square',.13); }
+let shakeAmt=0;
+function shake(a){ shakeAmt=Math.min(shakeAmt+a,1); }
+let dmgdirT=null;
+function damageFrom(from){
+ if(!from)return; const dx=from.x-player.pos.x, dz=from.z-player.pos.z;
+ const angW=Math.atan2(dx,dz), yawF=Math.atan2(-Math.sin(player.yaw),-Math.cos(player.yaw));
+ const rel=angW-yawF;
+ const el=$('dmgdir'); el.style.transform='translate(-50%,-50%) rotate('+(-rel*180/Math.PI)+'deg)';
+ el.style.opacity=1; clearTimeout(dmgdirT); dmgdirT=setTimeout(()=>el.style.opacity=0,900); }
+function hurtPlayer(d,from){
+ if(player.dead||DEMO||GOD)return;
+ damageFrom(from);
+ if(player.suit>0){ const absorbed=Math.min(player.suit,d*.6); player.suit-=absorbed; d-=absorbed; }
+ player.hp-=d; player.hurtT=.3; AU.hurt(); $('dmg').style.opacity=.9;
+ setTimeout(()=>$('dmg').style.opacity=0,180); shake(.25);
+ if(player.hp<=0){ player.dead=true; player.hp=0;
+  showMsg('SUBJECT: FREEMAN - STATUS: TERMINATED. RELOADING CHAPTER...');
+  setTimeout(()=>{ player.dead=false; player.hp=100; player.suit=25; loadChapter(currentChapter); },2600); }
+ updateHUD();
+}
+
+// ============================================================= PLAYER MOVE/COLLIDE
+function movePlayer(dt){
+ const k=player.keys;
+ const f=(k.KeyW?1:0)-(k.KeyS?1:0), r=(k.KeyD?1:0)-(k.KeyA?1:0);
+ const sprint=k.ShiftLeft||k.ShiftRight?player.sprintMul:1;
+ const sin=Math.sin(player.yaw), cos=Math.cos(player.yaw);
+ const wish=V3((-sin*f+cos*r)*-1,0,(-cos*f-sin*r)*-1);
+ // note: yaw PI faces -z; standard FPS math
+ wish.set(sin*f*-1+cos*r,0,cos*f*-1-sin*r);
+ if(wish.lengthSq()>0)wish.normalize();
+ const sp=player.speed*sprint;
+ player.vel.x=wish.x*sp; player.vel.z=wish.z*sp;
+ if(k.Space&&player.onGround){ player.vel.y=5.4*((player.gravScale||1)<1?1.4:1); player.onGround=false; }
+ player.vel.y-=14*dt*(player.gravScale||1);
+ player.pos.addScaledVector(player.vel,dt);
+ let gy=groundY(player.pos.x,player.pos.z);
+ for(const pl of platforms){ if(Math.abs(player.pos.x-pl.x)<pl.hw&&Math.abs(player.pos.z-pl.z)<pl.hd&&player.pos.y-1.7>=pl.top-.55&&pl.top>gy)gy=pl.top; }
+ if(player.pos.y<gy+1.7){ player.pos.y=gy+1.7; player.vel.y=0; player.onGround=true; }
+ // AABB collide (push out horizontally)
+ for(const c of colliders){
+  const px=player.pos.x,pz=player.pos.z,py=player.pos.y;
+  if(py>c.min.y&&py-1.6<c.max.y&&px>c.min.x-.5&&px<c.max.x+.5&&pz>c.min.z-.5&&pz<c.max.z+.5){
+   const dxl=px-(c.min.x-.5),dxr=(c.max.x+.5)-px,dzl=pz-(c.min.z-.5),dzr=(c.max.z+.5)-pz;
+   const m=Math.min(dxl,dxr,dzl,dzr);
+   if(m===dxl)player.pos.x=c.min.x-.5; else if(m===dxr)player.pos.x=c.max.x+.5;
+   else if(m===dzl)player.pos.z=c.min.z-.5; else player.pos.z=c.max.z+.5;
+  }
+ }
+ // head bob + footsteps
+ if(wish.lengthSq()>0&&player.onGround){ player.bob+=dt*sp*1.6;
+  const st=Math.sin(player.bob)>0;
+  if(st!==player._stepSign){ player._stepSign=st; const sp2=STEP_SND[currentChapter]||STEP_SND[0]; AU.noise(sp2[0],sp2[1],sp2[2],sp2[3]); } }
+ if(!player._wasAir&&player.vel.y===0&&!player.onGround)player._wasAir=true;
+ if(player._wasAir&&player.onGround){ player._wasAir=false; if(player._fallV<-6){ AU.noise(.14,.22,220,'lowpass'); shake(.12); } }
+ if(!player.onGround)player._fallV=player.vel.y;
+ const bobY=Math.sin(player.bob)*0.045, bobX=Math.cos(player.bob*.5)*0.03;
+ camera.position.set(player.pos.x+bobX*cos,player.pos.y+bobY,player.pos.z-bobX*sin);
+ camera.rotation.set(0,0,0); camera.rotateY(player.yaw); camera.rotateX(player.pitch+(player.recoil||0));
+ { const spr=(player.keys.ShiftLeft||player.keys.ShiftRight)&&Math.hypot(player.vel.x,player.vel.z)>6;
+  const tFov=spr?81:75;
+  if(Math.abs(camera.fov-tFov)>.05){ camera.fov+=(tFov-camera.fov)*Math.min(1,dt*6); camera.updateProjectionMatrix(); } }
+ if(shakeAmt>0){ shakeAmt=Math.max(0,shakeAmt-dt*2);
+  camera.position.x+=rand(-1,1)*shakeAmt*.1; camera.position.y+=rand(-1,1)*shakeAmt*.1; }
+ // viewmodel sway + recoil + reload dip + muzzle decay
+ vmGroup.position.x=.34+Math.cos(player.bob*.5)*.008;
+ vmGroup.position.y=-.32+Math.sin(player.bob)*.01;
+ { const it=performance.now()*.001;
+  vmGroup.position.y+=Math.sin(it*1.5)*.005; vmGroup.position.x+=Math.cos(it*.8)*.003;
+  vmGroup.rotation.y=Math.sin(it*.7)*.018; }
+ vmKick=Math.max(0,vmKick-dt*.9); vmGroup.position.z=-.6+vmKick;
+ if(muzzleL){ muzzleL.intensity=Math.max(0,muzzleL.intensity-dt*30); muzzleFlash.material.opacity=Math.max(0,muzzleFlash.material.opacity-dt*10); }
+ if(player.reloading>0){ const rp=1-player.reloading/1.6;
+  vmGroup.position.y-=.14*Math.sin(Math.min(Math.max(rp,0),1)*Math.PI);
+  vmGroup.rotation.z=.3*Math.sin(Math.min(Math.max(rp,0),1)*Math.PI); } else vmGroup.rotation.z=0;
+ if(player.swingT>0){ player.swingT-=dt;
+  vmGroup.rotation.x=-Math.sin((1-player.swingT/.35)*Math.PI)*.5;
+ } else vmGroup.rotation.x=0;
+}
+
+// ============================================================= MAIN LOOP
+let started=false, last=performance.now();
+function loop(){
+ requestAnimationFrame(loop);
+ const now=performance.now(); let dt=Math.min((now-last)/1000,.05); last=now;
+ if(FF)dt*=FF;
+ if(window._hitstop>0){ window._hitstop-=dt; dt*=.12; }
+ if(started&&!paused){
+  // dynamic crosshair spread: movement + fire heat + airborne
+  { const hv=Math.hypot(player.vel.x,player.vel.z);
+   player.heat=Math.max(0,(player.heat||0)-dt*2.4);
+   player.recoil=Math.max(0,(player.recoil||0)-((player.recoil||0)*8+.012)*dt);
+   const sp=Math.min(7+hv*2.0+player.heat*16+(player.onGround?0:6),34);
+   $('cross').style.setProperty('--sp',sp.toFixed(1)+'px'); }
+  if(!player.dead){
+   if(AUTO){ player.keys.KeyW=true; if(P.get('fire')==='1')player.mouseDown=true;
+    if(P.get('use')==='1'&&(!window._lastUse||performance.now()-window._lastUse>600)){ window._lastUse=performance.now(); window._useCalls=(window._useCalls||0)+1; useKey(); }
+    window._nearIt=interactables.length?Math.min(...interactables.map(it=>it.pos.distanceTo(player.pos))):-1;
+    // unstick: if barely progressing, weave
+    const az=player.pos.x+player.pos.z;
+    if(window._autoLast===undefined){ window._autoLast=az; window._autoT=0; }
+    window._autoT+=dt;
+    if(window._autoT>1.2){ if(Math.abs(az-window._autoLast)<.6){ window._autoStrafe=(window._autoStrafe===1?-1:1); window._autoStrafeT=performance.now(); }
+     window._autoLast=az; window._autoT=0; }
+    const strafing=performance.now()-(window._autoStrafeT||0)<900;
+    if(!window._dbgT||performance.now()-window._dbgT>500){ window._dbgT=performance.now();
+     document.title='CH'+(currentChapter+1)+' x'+player.pos.x.toFixed(1)+' y'+player.pos.y.toFixed(1)+' z'+player.pos.z.toFixed(1)+' hp'+player.hp
+      +' it'+interactables.length+' cmp'+(chapterData.completing?1:0); }
+    player.keys.KeyA=strafing&&window._autoStrafe===1; player.keys.KeyD=strafing&&window._autoStrafe===-1; }
+   if(POSE==='combat'){ const pt=poseTargets.find(t2=>!t2.dead);
+    if(pt){ const dx=pt.mesh.position.x-player.pos.x, dz=pt.mesh.position.z-player.pos.z;
+     player.yaw=Math.atan2(-dx,-dz);
+     player.pitch=Math.atan2((pt.mesh.position.y+1.0)-player.pos.y,Math.hypot(dx,dz));
+     player.hp=100;
+     if(player.reloading>0){ player.reloading=0; }
+     player.ammo.smg=Math.max(player.ammo.smg,1);
+     if(player.fireCd<=0)tryFire(); } }
+   movePlayer(dt);
+   if(player.fireCd>0)player.fireCd-=dt;
+   if(player.reloading>0){ player.reloading-=dt; if(player.reloading<=0)finishReload(); }
+   if(player.mouseDown&&WDEF[player.weapon].auto)tryFire();
+   if(player.hurtT>0)player.hurtT-=dt;
+  }
+  updateProps(dt); updateEnemies(dt); updateProjectiles(dt); updateThrown(dt);
+   // objective waypoint projection
+   const wp=$('wp'), wpt=chapterData.waypoint;
+   if(wpt&&started&&!player.dead){ const vd=wpt.clone().sub(player.pos); const dist=vd.length();
+    if(dist>2.5){ const pr=wpt.clone().project(camera);
+     if(pr.z<1){ wp.style.display='block';
+      wp.style.left=clamp((pr.x*.5+.5)*100,4,96)+'%'; wp.style.top=clamp((-pr.y*.5+.5)*100,6,90)+'%';
+      $('wpd').textContent=Math.round(dist)+'m'; } else wp.style.display='none'; }
+    else wp.style.display='none'; } else wp.style.display='none';
+  chapters[currentChapter].onUpdate(dt);
+  if(chapterData.snow)updateSnow(dt);
+  updateMotes(dt);
+  // pickup weapon markers
+  for(const pk of pickups){ if(pk.kind==='weapon'&&!pk.claimed){
+   if(pk.mesh.position.distanceTo(player.pos)<1.3){ pk.claimed=true; grantChapterWeapon(); } } }
+  AU.music.update(now/1000);
+  if(chapterData.sun){ chapterData.sun.position.set(player.pos.x+chapters[currentChapter].sun[2][0],chapters[currentChapter].sun[2][1],player.pos.z+chapters[currentChapter].sun[2][2]);
+   chapterData.sun.target.position.copy(player.pos); chapterData.sun.target.updateMatrixWorld(); }
+ }
+ if(OPT.q==='low')renderer.render(scene,camera); else composer.render();
+}
+function grantChapterWeapon(){
+ const d=chapterData;
+ if(d.smgPickup&&!player.weapons.smg){ player.weapons.smg=true; player.reserve.smg+=90; showMsg('MP7 SMG ACQUIRED'); equip('smg'); }
+ else if(d.shotgunPickup&&!player.weapons.shotgun){ player.weapons.shotgun=true; player.reserve.shotgun+=12; showMsg('SPAS-12 ACQUIRED'); equip('shotgun'); }
+ else if(d.gravPickup&&!player.weapons.grav){ player.weapons.grav=true; showMsg('ZERO-POINT ENERGY FIELD MANIPULATOR ACQUIRED - E to grab, E again to punt'); equip('grav'); }
+ else if(d.pulsePickup&&!player.weapons.pulse){ player.weapons.pulse=true; player.reserve.pulse+=90; showMsg('OSIPR PULSE RIFLE ACQUIRED'); equip('pulse'); }
+ // consume marker
+ for(let i=pickups.length-1;i>=0;i--){ if(pickups[i].kind==='weapon'){ levelGroup.remove(pickups[i].mesh); pickups.splice(i,1);} }
+ AU.stinger(); updateHUD();
+}
+
+// ============================================================= BOOT
+buildViewmodel();
+{ const os=$('opt-sens'),ov=$('opt-vol'),oq=$('opt-q');
+ os.value=OPT.sens*100; ov.value=OPT.vol*100; oq.value=OPT.q;
+ $('opts').addEventListener('click',e=>e.stopPropagation());
+ os.addEventListener('input',()=>{ OPT.sens=os.value/100; saveOPT(); });
+ ov.addEventListener('input',()=>{ OPT.vol=ov.value/100; saveOPT(); if(AU.master)AU.master.gain.value=.55*OPT.vol; });
+ oq.addEventListener('change',()=>{ OPT.q=oq.value; saveOPT();
+  renderer.setPixelRatio(OPT.q==='low'?1:Math.min(devicePixelRatio,2));
+  renderer.shadowMap.enabled=OPT.q!=='low'; });
+}
+function syncPauseOpts(){ $('p-sens').value=OPT.sens*100; $('p-vol').value=OPT.vol*100; $('p-q').value=OPT.q; }
+$('pause-resume').addEventListener('click',()=>{ paused=false; $('pause').style.display='none'; canvas.requestPointerLock(); });
+$('pause-restart').addEventListener('click',()=>{ paused=false; $('pause').style.display='none'; player.hp=100; player.suit=Math.max(player.suit,25); player.dead=false; loadChapter(currentChapter); canvas.requestPointerLock(); });
+$('pause-quit').addEventListener('click',()=>{ paused=false; $('pause').style.display='none'; started=false; $('menu').style.display='flex'; });
+$('p-sens').addEventListener('input',e=>{ OPT.sens=e.target.value/100; saveOPT(); });
+$('p-vol').addEventListener('input',e=>{ OPT.vol=e.target.value/100; saveOPT(); if(AU.master)AU.master.gain.value=.55*OPT.vol; });
+$('p-q').addEventListener('change',e=>{ OPT.q=e.target.value; saveOPT();
+ renderer.setPixelRatio(OPT.q==='low'?1:Math.min(devicePixelRatio,2)); renderer.shadowMap.enabled=OPT.q!=='low'; });
+$('menu').addEventListener('click',()=>{
+ if(started)return; started=true;
+ AU.init();
+ $('menu').style.display='none';
+ loadChapter(clamp(START_CH,0,chapters.length-1));
+ canvas.requestPointerLock();
+});
+loadChapter(clamp(START_CH,0,chapters.length-1)); // pre-build behind menu
+if(P.get('play')==='1'){ started=true; $('menu').style.display='none';
+ loadChapter(clamp(START_CH,0,chapters.length-1));
+ if(P.get('x'))player.pos.x=+P.get('x');
+ if(P.get('z'))player.pos.z=+P.get('z');
+ if(P.get('x')||P.get('z'))player.pos.y=groundY(player.pos.x,player.pos.z)+1.7;
+ if(P.get('y'))player.pos.y=+P.get('y');
+ if(P.get('yaw'))player.yaw=+P.get('yaw');
+}
+const POSE=P.get('pose');
+let poseTargets=[];
+if(POSE==='combat'){ started=true; $('menu').style.display='none';
+ loadChapter(clamp(START_CH,0,chapters.length-1));
+ if(P.get('x'))player.pos.x=+P.get('x'); if(P.get('z'))player.pos.z=+P.get('z');
+ player.pos.y=groundY(player.pos.x,player.pos.z)+1.7;
+ if(P.get('y'))player.pos.y=+P.get('y');
+ const n0=enemies.length;
+ spawnSoldier(player.pos.x-1.5,player.pos.z-8); spawnSoldier(player.pos.x+2,player.pos.z-9);
+ poseTargets=enemies.slice(n0);
+ player.weapon='smg'; player.ammo.smg=player.mags.smg; player.reserve.smg=999; updateHUD(); }
+$('load').style.display='none';
+loop();
+</script>
+</body>
+</html>
