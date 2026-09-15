@@ -36,7 +36,7 @@
   #menu h1{font-size:64px;margin:0;letter-spacing:6px;text-shadow:0 0 24px #f906}
   #menu h1 .lam{color:#fff}
   #menu p{color:#889;font-size:14px;margin:6px 0}
-  #menu .go{margin-top:28px;font-size:18px;color:#f90;border:1px solid #f906;padding:10px 26px;animation:p 1.6s infinite}
+  #menu .go{margin-top:28px;font-size:18px;color:#f90;border:1px solid #f906;padding:10px 26px;animation:p 1.6s infinite}.menuacts{display:flex;gap:10px;margin-top:28px}.menubtn{font-size:15px;color:#f90;border:1px solid #f906;padding:10px 22px;background:rgba(5,8,11,.72);cursor:pointer}.menubtn.secondary{font-size:12px;color:#fa8;border-color:#f904}.menubtn:hover{background:#f901}.saveflag{font-size:10px;color:#79828a;letter-spacing:1px;margin-top:10px}
   @keyframes p{0%,100%{opacity:.5}50%{opacity:1}}
   #end{position:fixed;inset:0;z-index:11;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;color:#f90}
   #load{position:fixed;inset:0;z-index:12;background:#000;color:#f90;display:flex;align-items:center;justify-content:center;font-size:14px;letter-spacing:2px}
@@ -70,7 +70,7 @@
    <label>VOLUME <input id="opt-vol" type="range" min="0" max="100" value="100" style="width:100px;accent-color:#f90;vertical-align:middle"></label>
    <label>QUALITY <select id="opt-q" style="background:#0a0c10;color:#f90;border:1px solid #f905;font-family:inherit;font-size:12px"><option value="high">HIGH</option><option value="low">LOW</option></select></label>
   </div>
-  <div class="go">CLICK TO BEGIN</div>
+  <div class="menuacts"><div id="continue" class="menubtn" style="display:none">CONTINUE</div><div id="newgame" class="menubtn secondary">NEW GAME</div></div><div id="saveflag" class="saveflag">NO FIELD CHECKPOINT</div>
 </div>
 <div id="pause" style="position:fixed;inset:0;z-index:10;background:rgba(3,5,8,.85);display:none;flex-direction:column;align-items:center;justify-content:center;color:#f90">
  <h2 style="letter-spacing:6px;margin:0 0 4px;font-size:30px">PAUSED</h2>
@@ -97,10 +97,15 @@ import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 // ============================================================= CORE
 const P = new URLSearchParams(location.search);
 const FF = +P.get('ff')||0, DEMO = P.get('demo')==='1', START_CH = (+P.get('chapter')||1)-1;
-const AUTO = P.get('auto')==='1', GOD = P.get('god')==='1';
+const AUTO = P.get('auto')==='1', GOD = P.get('god')==='1', POSE=P.get('pose');
 const OPT = Object.assign({sens:1,vol:1,q:'high'}, JSON.parse(localStorage.getItem('hl3opt')||'{}'));
 const STEP_SND=[[.06,.07,480,'lowpass'],[.09,.045,2400,'bandpass'],[.05,.09,300,'lowpass'],[.05,.06,950,'lowpass'],[.07,.05,600,'bandpass']];
 function saveOPT(){ try{localStorage.setItem('hl3opt',JSON.stringify(OPT));}catch(e){} }
+const SAVEKEY='hl3-progress-v1';
+function readSave(){try{const v=JSON.parse(localStorage.getItem(SAVEKEY)||'null');return v&&Number.isInteger(v.chapter)?v:null}catch(e){return null}}
+function writeSave(reason='field'){if(DEMO||POSE||!started)return;try{localStorage.setItem(SAVEKEY,JSON.stringify({chapter:currentChapter,hp:Math.max(25,Math.ceil(player.hp)),suit:Math.ceil(player.suit),weapons:{...player.weapons},reserve:{...player.reserve},reason,at:Date.now()}));window._checkpointDbg='saved/ch'+(currentChapter+1)+'/'+reason;refreshContinue()}catch(e){window._checkpointDbg='failed'}}
+function clearSave(){try{localStorage.removeItem(SAVEKEY)}catch(e){}refreshContinue()}
+function refreshContinue(){const v=readSave(),b=$('continue'),f=$('saveflag');if(!b||!f)return;b.style.display=v?'block':'none';f.textContent=v?'FIELD CHECKPOINT / CHAPTER '+(v.chapter+1)+' / '+chapters[v.chapter].title:'NO FIELD CHECKPOINT'}
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
@@ -1576,7 +1581,7 @@ function clearLevel(){
  levelGroup=new THREE.Group(); scene.add(levelGroup);
  colliders=[]; platforms=[]; thrown=[]; props=[]; pickups=[]; enemies=[]; projectiles=[]; interactables=[]; chapterData={};
 }
-function loadChapter(i){
+function loadChapter(i,restore=null){
  currentChapter=i; clearLevel(); chapterKills=0; chapterT0=performance.now();
  const ch=chapters[i];
  scene.fog=new THREE.FogExp2(ch.fog[0],ch.fog[1]);
@@ -1596,6 +1601,8 @@ function loadChapter(i){
  // reset player to chapter start
  const sp=ch.spawn||[0,6,0]; player.pos.set(sp[0],1.7,sp[1]); player.vel.set(0,0,0); player.yaw=sp[2]||0; player.pitch=0;
  player.heldProp=null; player.gravScale=1;
+ if(restore){player.hp=restore.hp||100;player.suit=restore.suit||0;player.weapons=Object.assign(player.weapons,restore.weapons||{});player.reserve=Object.assign(player.reserve,restore.reserve||{});const w=WORDER.filter(x=>player.weapons[x]).pop();if(w)player.weapon=w;}
+ writeSave(restore?'resume':'chapter-start');
  // chapter transition card + banner
  const cc=$('chcard'); cc.style.display='flex'; cc.style.opacity=1;
  $('chcard-t').textContent=ch.name; $('chcard-h').textContent=ch.title;
@@ -1763,7 +1770,7 @@ function loop(){
     const strafing=performance.now()-(window._autoStrafeT||0)<900;
     if(!window._dbgT||performance.now()-window._dbgT>500){ window._dbgT=performance.now();
      document.title='CH'+(currentChapter+1)+' x'+player.pos.x.toFixed(1)+' y'+player.pos.y.toFixed(1)+' z'+player.pos.z.toFixed(1)+' hp'+player.hp
-      +' it'+interactables.length+' cmp'+(chapterData.completing?1:0); }
+      +' it'+interactables.length+' cmp'+(chapterData.completing?1:0)+' save'+(readSave()?'ch'+(readSave().chapter+1):'none'); }
     player.keys.KeyA=strafing&&window._autoStrafe===1; player.keys.KeyD=strafing&&window._autoStrafe===-1; }
    if(POSE==='combat'){ const pt=poseTargets.find(t2=>!t2.dead);
     if(pt){ const dx=pt.mesh.position.x-player.pos.x, dz=pt.mesh.position.z-player.pos.z;
@@ -1830,14 +1837,13 @@ $('p-sens').addEventListener('input',e=>{ OPT.sens=e.target.value/100; saveOPT()
 $('p-vol').addEventListener('input',e=>{ OPT.vol=e.target.value/100; saveOPT(); if(AU.master)AU.master.gain.value=.55*OPT.vol; });
 $('p-q').addEventListener('change',e=>{ OPT.q=e.target.value; saveOPT();
  renderer.setPixelRatio(OPT.q==='low'?1:Math.min(devicePixelRatio,2)); renderer.shadowMap.enabled=OPT.q!=='low'; });
-$('menu').addEventListener('click',()=>{
- if(started)return; started=true;
- AU.init();
- $('menu').style.display='none';
- loadChapter(clamp(START_CH,0,chapters.length-1));
- canvas.requestPointerLock();
-});
-loadChapter(clamp(START_CH,0,chapters.length-1)); // pre-build behind menu
+function beginRun(ch,restore=null){if(started)return;started=true;AU.init();$('menu').style.display='none';loadChapter(ch,restore);canvas.requestPointerLock();}
+$('continue').addEventListener('click',e=>{e.stopPropagation();const v=readSave();if(v)beginRun(clamp(v.chapter,0,chapters.length-1),v);});
+$('newgame').addEventListener('click',e=>{e.stopPropagation();clearSave();beginRun(clamp(START_CH,0,chapters.length-1));});
+if(P.get('seedcheckpoint')){localStorage.setItem(SAVEKEY,JSON.stringify({chapter:clamp(+P.get('seedcheckpoint')-1,0,chapters.length-1),hp:73,suit:42,weapons:{crowbar:true,pistol:true,smg:true},reserve:{pistol:36,smg:90},reason:'qa',at:Date.now()}));}
+refreshContinue();
+if(P.get('resume')==='1'&&readSave()){const v=readSave();beginRun(v.chapter,v);}
+if(!started)loadChapter(clamp(START_CH,0,chapters.length-1)); // pre-build behind menu
 if(P.get('play')==='1'){ started=true; $('menu').style.display='none';
  loadChapter(clamp(START_CH,0,chapters.length-1));
  if(P.get('x'))player.pos.x=+P.get('x');
@@ -1846,7 +1852,7 @@ if(P.get('play')==='1'){ started=true; $('menu').style.display='none';
  if(P.get('y'))player.pos.y=+P.get('y');
  if(P.get('yaw'))player.yaw=+P.get('yaw');
 }
-const POSE=P.get('pose');
+if(P.get('dbg')==='1')setInterval(()=>document.body.setAttribute('data-dbg','chapter='+(currentChapter+1)+' started='+(started?1:0)+' checkpoint='+(window._checkpointDbg||'none')+' save='+(readSave()?'ch'+(readSave().chapter+1):'none')),400);
 let poseTargets=[];
 if(POSE==='combat'){ started=true; $('menu').style.display='none';
  loadChapter(clamp(START_CH,0,chapters.length-1));
